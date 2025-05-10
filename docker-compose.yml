@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    container_name: tiemply-vuejs
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000/api
