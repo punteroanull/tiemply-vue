@@ -46,16 +46,26 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     loading.value = true;
 
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      const employeeId = authStore.user.employee_records?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
 
       const response = await api.get(`/worklogs/status/${employeeId}`);
-      status.value = response.data;
+      const data = response.data;
+
+      // Map the API response to the WorkStatus interface
+      status.value = {
+        checked_in: data.status === "in",
+        last_check_in:
+          data.status === "in" ? data.last_activity?.time : undefined,
+        last_check_out:
+          data.status === "out" ? data.last_activity?.time : undefined,
+        current_duration: "", // This will be updated if checked in
+      };
 
       // Update current duration if checked in
-      if (status.value?.checked_in && status.value?.last_check_in) {
+      if (status.value.checked_in && status.value.last_check_in) {
         updateCurrentDuration();
       }
     } catch (error: any) {
@@ -83,18 +93,19 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
   async function checkIn() {
     if (!authStore.user?.id) return false;
-
+    console.log("Check-in initiated");
     checkingIn.value = true;
-
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      //console.log("Auth Store User:", authStore.user);
+      //console.log("Employee Records:", authStore.user.employee_records);
+      const employeeId = authStore.user.employee_records?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
 
       const response = await api.post("/worklogs/check-in", {
         employee_id: employeeId,
-        notes: "Checked in via WorkTracker app",
+        notes: "Checked in via Tiemply app",
       });
 
       await fetchStatus();
@@ -103,8 +114,24 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       startDurationUpdateInterval();
       return true;
     } catch (error: any) {
-      console.error("Check-in error:", error);
-      toast.error("Failed to check in. Please try again.");
+      // Handle API error responses
+      if (error.response) {
+        const statusCode = error.response.status;
+        const errorMessage =
+          error.response.data?.message || "An error occurred";
+
+        if (statusCode === 422) {
+          // Handle specific 422 error
+          toast.error(errorMessage);
+        } else {
+          // Handle other status codes
+          toast.error(`Error ${statusCode}: ${errorMessage}`);
+        }
+      } else {
+        // Handle network or unexpected errors
+        console.error("Check-in error:", error);
+        toast.error("Failed to check in. Please try again.");
+      }
       return false;
     } finally {
       checkingIn.value = false;
@@ -117,14 +144,14 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     checkingOut.value = true;
 
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      const employeeId = authStore.user.employee_records?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
 
       const response = await api.post("/worklogs/check-out", {
         employee_id: employeeId,
-        notes: "Checked out via WorkTracker app",
+        notes: "Checked out via Tiemply app",
       });
 
       await fetchStatus();

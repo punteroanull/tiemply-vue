@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useWorkLogsStore } from "../stores/workLogs";
 import {
+  parse,
   format,
   parseISO,
   subDays,
@@ -141,9 +142,19 @@ watch(
 );
 
 // Format time display
+//Since it gives me this error: Invalid time value: 08:56:00 RangeError: Invalid time value
 function formatTime(timeString: string | undefined) {
-  if (!timeString) return "-";
-  return format(parseISO(timeString), "h:mm a");
+  //console.log("timeString", timeString);
+  if (!timeString) return "-"; // Return a default value if the time is invalid
+  try {
+    // Combine the time string with today's date to create a valid Date object
+    const today = new Date();
+    const dateWithTime = parse(timeString, "HH:mm:ss", today);
+    return format(dateWithTime, "h:mm a");
+  } catch (error) {
+    console.error("Invalid time value:", timeString, error);
+    return "-";
+  }
 }
 
 // Helper to determine if a day has work logs
