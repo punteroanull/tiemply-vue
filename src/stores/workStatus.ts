@@ -151,6 +151,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       const response = await api.post("/worklogs/check-out", {
         employee_id: employeeId,
+        category: "shift_end",
         notes: "Checked out via Tiemply app",
       });
 
