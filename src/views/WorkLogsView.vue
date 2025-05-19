@@ -104,9 +104,7 @@ function changeTab(tab: string) {
   if (tab === "daily") {
     workLogsStore.fetchDailyReport(dateForApi.value);
   } else if (tab === "weekly") {
-    workLogsStore.fetchWeeklyReport(
-      `${weekStartForApi.value}/${weekEndForApi.value}`
-    );
+    workLogsStore.fetchWeeklyReport(`${weekStartForApi.value}`);
   } else if (tab === "monthly") {
     const [year, month] = monthForApi.value.split("-");
     workLogsStore.fetchMonthlyReport(parseInt(year), parseInt(month));
@@ -125,9 +123,7 @@ watch(
 
 watch([() => weekStartForApi.value, () => weekEndForApi.value], () => {
   if (activeTab.value === "weekly") {
-    workLogsStore.fetchWeeklyReport(
-      `${weekStartForApi.value}/${weekEndForApi.value}`
-    );
+    workLogsStore.fetchWeeklyReport(`${weekStartForApi.value}`);
   }
 });
 
@@ -359,7 +355,7 @@ onMounted(async () => {
             class="p-4"
           >
             <div
-              class="flex flex-col md:flex-row md:justify-between md:items-center"
+              class="flex flex-col md:flex-row md:justify-between md:items-center mb-4"
             >
               <div class="mb-2 md:mb-0">
                 <h3 class="font-medium text-neutral-800">
@@ -437,6 +433,64 @@ onMounted(async () => {
               <div v-else class="text-neutral-500 italic">
                 No work logs for this day
               </div>
+            </div>
+
+            <!-- Table for detailed work logs -->
+            <div v-if="day.logs && day.logs.length > 0" class="mt-4">
+              <table class="min-w-full divide-y divide-neutral-200">
+                <thead class="bg-neutral-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                    >
+                      Time
+                    </th>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                    >
+                      Type
+                    </th>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                    >
+                      Category
+                    </th>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                    >
+                      Notes
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-neutral-200">
+                  <tr v-for="(log, logIndex) in day.logs" :key="logIndex">
+                    <td
+                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                    >
+                      {{ log.time ? formatTime(log.time) : "-" }}
+                    </td>
+                    <td
+                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                    >
+                      {{ log.type || "-" }}
+                    </td>
+                    <td
+                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                    >
+                      {{ log.category || "-" }}
+                    </td>
+                    <td
+                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                    >
+                      {{ log.notes || "-" }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

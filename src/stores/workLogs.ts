@@ -22,6 +22,7 @@ interface WorkLogPair {
   check_in?: WorkLog;
   check_out?: WorkLog;
   duration?: string;
+  logs: WorkLog[];
 }
 
 interface WorkLogReport {
@@ -67,10 +68,25 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
             check_in: response.data.shift?.start || null,
             check_out: response.data.shift?.end || null,
             duration: response.data.shift?.total_minutes
-              ? `${Math.floor(response.data.shift.total_minutes / 60)}:${
-                  response.data.shift.total_minutes % 60
-                }`
+              ? `${Math.abs(
+                  Math.floor(response.data.shift.total_minutes / 60)
+                )}:${Math.abs(
+                  Math.floor(response.data.shift.total_minutes % 60)
+                )}`
               : "0:00",
+            logs:
+              response.data.all_logs?.map((log: any) => ({
+                id: log.id,
+                uuid: log.uuid,
+                employee_id: log.employee_id,
+                date: log.date,
+                time: log.time,
+                type: log.type,
+                category: log.category,
+                paired_log_id: log.paired_log_id,
+                notes: log.notes,
+                formatted_duration: log.formatted_duration,
+              })) || [],
           },
         ],
         total_duration: response.data.total_work_time?.formatted || "0:00",
@@ -177,7 +193,11 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
               }
             : null,
           duration: day.work_minutes
-            ? `${Math.floor(day.work_minutes / 60)}:${day.work_minutes % 60}`
+            ? `${Math.abs(Math.floor(day.work_minutes / 60))}:${Math.abs(
+                Math.floor(
+                  response.data.shift.total_minutesday.work_minutes % 60
+                )
+              )}`
             : "0:00",
           status: day.status,
           is_weekend: day.is_weekend,

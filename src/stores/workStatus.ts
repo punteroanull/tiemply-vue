@@ -53,7 +53,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       const response = await api.get(`/worklogs/status/${employeeId}`);
       const data = response.data;
-
+      console.log("Work status response:", data);
       // Map the API response to the WorkStatus interface
       status.value = {
         checked_in: data.status === "in",
