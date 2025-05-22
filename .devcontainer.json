@@ -6,7 +6,6 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "Vue.volar",
         "Vue.vscode-typescript-vue-plugin",
         "bradlc.vscode-tailwindcss",
         "esbenp.prettier-vscode",
