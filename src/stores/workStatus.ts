@@ -225,6 +225,28 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     };
   }
 
+  function getEmployeeId() {
+  return authStore.user?.employee_records?.[0]?.id || null;
+}
+
+function setOfflineCheckIn() {
+  status.value = {
+    ...status.value,
+    checked_in: true,
+    last_check_in: new Date().toISOString(),
+  };
+  startDurationUpdateInterval();
+}
+
+function setOfflineCheckOut() {
+  status.value = {
+    ...status.value,
+    checked_in: false,
+    last_check_out: new Date().toISOString(),
+  };
+  stopDurationUpdateInterval();
+}
+
   return {
     status,
     loading,
@@ -238,5 +260,8 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     checkIn,
     checkOut,
     initialize,
+    getEmployeeId,
+    setOfflineCheckIn,
+    setOfflineCheckOut,
   };
 });

@@ -6,6 +6,7 @@ import 'vue-toastification/dist/index.css'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
+import { setupOfflineListeners } from './utils/offlineManager'
 
 const app = createApp(App)
 
@@ -28,5 +29,8 @@ app.use(Toast, {
   icon: true,
   rtl: false
 })
+
+// Configurar listeners para modo offline
+setupOfflineListeners()
 
 app.mount('#app')

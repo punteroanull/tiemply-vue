@@ -1,44 +1,72 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useToast } from "vue-toastification";
+import { useWorkStatusStore } from "../stores/workStatus";
+import { savePendingAction } from "../utils/offlineManager";
 
 const props = defineProps({
-  isCheckedIn: {
-    type: Boolean,
-    required: true,
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-  },
-  currentDuration: {
-    type: String,
-    default: "",
-  },
-  lastCheckInTime: {
-    type: String,
-    default: "",
-  },
+  isCheckedIn: { type: Boolean, required: true },
+  isLoading: { type: Boolean, default: false },
+  currentDuration: { type: String, default: "" },
+  lastCheckInTime: { type: String, default: "" },
 });
 
 const emit = defineEmits(["check-in", "check-out"]);
 const toast = useToast();
 const showConfirmation = ref(false);
+const workStatusStore = useWorkStatusStore();
 
 function handleClick() {
   if (props.isLoading) return;
 
   if (props.isCheckedIn) {
-    // When checking out, show confirmation
     showConfirmation.value = true;
   } else {
-    // When checking in, just do it
+    handleCheckIn();
+  }
+}
+
+async function handleCheckIn() {
+  if (!navigator.onLine) {
+    // Guardar para sincronización posterior
+    const employeeId = workStatusStore.getEmployeeId();
+    if (employeeId) {
+      savePendingAction({
+        type: "check-in",
+        timestamp: Date.now(),
+        employeeId,
+        data: { notes: "Checked in offline via Tiemply app" },
+      });
+      toast.info("Saved check-in for syncing when connection is restored");
+      // Actualizar UI temporalmente
+      workStatusStore.setOfflineCheckIn();
+    }
+  } else {
     emit("check-in");
   }
 }
 
-function confirmCheckOut() {
-  emit("check-out");
+async function confirmCheckOut() {
+  if (!navigator.onLine) {
+    // Guardar para sincronización posterior
+    const employeeId = workStatusStore.getEmployeeId();
+    if (employeeId) {
+      savePendingAction({
+        type: "check-out",
+        timestamp: Date.now(),
+        employeeId,
+        data: {
+          category: "shift_end",
+          notes: "Checked out offline via Tiemply app",
+        },
+      });
+      toast.info("Saved check-out for syncing when connection is restored");
+      // Actualizar UI temporalmente
+      workStatusStore.setOfflineCheckOut();
+    }
+  } else {
+    emit("check-out");
+  }
   showConfirmation.value = false;
 }
 
