@@ -17,7 +17,7 @@ const showConfirmation = ref(false);
 const workStatusStore = useWorkStatusStore();
 
 function handleClick() {
-  if (props.isLoading) return;
+  if (props.isLoading || workStatusStore.gettingLocation) return;
 
   if (props.isCheckedIn) {
     showConfirmation.value = true;
@@ -84,15 +84,30 @@ const buttonClasses = computed(() => {
 });
 
 const buttonText = computed(() => {
-  if (props.isLoading) {
+  if (workStatusStore.gettingLocation) {
+    return "Getting location...";
+  } else if (props.isLoading) {
     return props.isCheckedIn ? "Checking out..." : "Checking in...";
   } else {
     return props.isCheckedIn ? "Check out" : "Check in";
   }
 });
 
+const isButtonDisabled = computed(() => {
+  return Boolean(
+    props.isLoading ||
+      workStatusStore.gettingLocation ||
+      (workStatusStore.isGeolocationRequired && !!workStatusStore.locationError)
+  );
+});
+
 const buttonIcon = computed(() => {
-  if (props.isCheckedIn) {
+  if (workStatusStore.gettingLocation || props.isLoading) {
+    return `<svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>`;
+  } else if (props.isCheckedIn) {
     return `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
       <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
     </svg>`;
@@ -102,6 +117,23 @@ const buttonIcon = computed(() => {
     </svg>`;
   }
 });
+
+// Función para obtener el icono de geolocalización
+function getLocationIcon(hasLocation: boolean, hasError: boolean) {
+  if (hasError) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+    </svg>`;
+  } else if (hasLocation) {
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+    </svg>`;
+  } else {
+    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+      <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+    </svg>`;
+  }
+}
 </script>
 
 <template>
@@ -109,15 +141,57 @@ const buttonIcon = computed(() => {
     <!-- Main Button -->
     <button
       @click="handleClick"
+      :disabled="isButtonDisabled"
       :class="[
-        'text-white font-medium rounded-full shadow-lg flex items-center transition-all duration-300 transform hover:scale-105 focus:outline-none px-5 py-3',
+        'text-white font-medium rounded-full shadow-lg flex items-center transition-all duration-300 transform hover:scale-105 focus:outline-none px-5 py-3 relative',
         buttonClasses,
-        { 'opacity-75 cursor-not-allowed': isLoading },
+        { 'opacity-75 cursor-not-allowed': isButtonDisabled },
       ]"
     >
-      <span v-if="isLoading" class="inline-block h-5 w-5 mr-2">
+      <span v-html="buttonIcon"></span>
+      {{ buttonText }}
+
+      <!-- Indicador de geolocalización -->
+      <div
+        v-if="workStatusStore.isGeolocationEnabled"
+        class="absolute -top-1 -right-1 flex items-center justify-center"
+        :title="
+          workStatusStore.locationError
+            ? `Location error: ${workStatusStore.locationError.message}`
+            : workStatusStore.locationData
+            ? `Location: ${workStatusStore.formattedLocation}`
+            : 'Location will be requested'
+        "
+      >
+        <div
+          v-html="
+            getLocationIcon(
+              !!workStatusStore.locationData,
+              !!workStatusStore.locationError
+            )
+          "
+          class="bg-white rounded-full p-1 shadow-sm"
+        ></div>
+      </div>
+    </button>
+
+    <!-- Geolocation Status Tooltip -->
+    <div
+      v-if="
+        workStatusStore.isGeolocationEnabled &&
+        (workStatusStore.gettingLocation ||
+          workStatusStore.locationData ||
+          workStatusStore.locationError)
+      "
+      class="absolute -top-20 right-0 bg-white rounded-lg shadow-lg px-3 py-2 text-sm text-neutral-800 whitespace-nowrap max-w-xs z-50"
+    >
+      <!-- Getting location -->
+      <div
+        v-if="workStatusStore.gettingLocation"
+        class="flex items-center text-blue-600"
+      >
         <svg
-          class="animate-spin h-5 w-5 text-white"
+          class="animate-spin h-4 w-4 mr-2"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -136,14 +210,80 @@ const buttonIcon = computed(() => {
             d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
           ></path>
         </svg>
-      </span>
-      <span v-else v-html="buttonIcon"></span>
-      {{ buttonText }}
-    </button>
+        Getting location...
+      </div>
 
-    <!-- Work Duration Tooltip (only shown when checked in) -->
+      <!-- Location obtained -->
+      <div v-else-if="workStatusStore.locationData" class="text-green-600">
+        <div class="flex items-center mb-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4 mr-1"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span class="font-medium">Location ready</span>
+        </div>
+        <div class="text-xs text-neutral-600 break-words">
+          {{ workStatusStore.formattedLocation }}
+        </div>
+        <div
+          v-if="workStatusStore.locationData.address"
+          class="text-xs text-neutral-500 mt-1 break-words"
+        >
+          {{ workStatusStore.locationData.address }}
+        </div>
+      </div>
+
+      <!-- Location error -->
+      <div v-else-if="workStatusStore.locationError" class="text-red-600">
+        <div class="flex items-center mb-1">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4 mr-1"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path
+              fill-rule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clip-rule="evenodd"
+            />
+          </svg>
+          <span class="font-medium">Location error</span>
+        </div>
+        <div class="text-xs text-neutral-600 break-words">
+          {{ workStatusStore.locationError.message }}
+        </div>
+        <div
+          v-if="!workStatusStore.isGeolocationRequired"
+          class="text-xs text-neutral-500 mt-1"
+        >
+          Will proceed without location
+        </div>
+      </div>
+
+      <div
+        class="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-2 h-2 bg-white"
+      ></div>
+    </div>
+
+    <!-- Work Duration Tooltip (only shown when checked in and no geolocation tooltip) -->
     <div
-      v-if="isCheckedIn && currentDuration && !showConfirmation"
+      v-if="
+        isCheckedIn &&
+        currentDuration &&
+        !showConfirmation &&
+        !workStatusStore.gettingLocation &&
+        !workStatusStore.locationData &&
+        !workStatusStore.locationError
+      "
       class="absolute -top-12 right-0 bg-white rounded-lg shadow-lg px-3 py-2 text-sm text-neutral-800 whitespace-nowrap"
     >
       <div class="flex items-center">
@@ -206,7 +346,34 @@ const buttonIcon = computed(() => {
               You've been working for {{ currentDuration }}
             </span>
           </p>
+
+          <!-- Location warning if geolocation is enabled -->
+          <div
+            v-if="workStatusStore.isGeolocationEnabled"
+            class="mt-3 p-2 bg-blue-50 rounded-md"
+          >
+            <div class="flex items-center text-blue-800 text-sm">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4 mr-1"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <span>{{
+                workStatusStore.isGeolocationRequired
+                  ? "Location will be required"
+                  : "Location will be requested"
+              }}</span>
+            </div>
+          </div>
         </div>
+
         <div class="flex space-x-3">
           <button
             @click="cancelCheckOut"
@@ -217,6 +384,12 @@ const buttonIcon = computed(() => {
           <button
             @click="confirmCheckOut"
             class="flex-1 py-2 bg-error text-white rounded-md hover:bg-red-700"
+            :disabled="
+              !!(
+                workStatusStore.isGeolocationRequired &&
+                workStatusStore.locationError
+              )
+            "
           >
             Check Out
           </button>

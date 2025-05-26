@@ -110,9 +110,15 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     loading.value = true;
 
     try {
+      // Agrega logs para depuración
+      console.log("authStore.user:", authStore.user);
+      console.log("employee_records:", authStore.user?.employee_records);
+
       const employeeId = authStore.user.employee_records?.[0]?.id;
       if (!employeeId) {
-        throw new Error("Employee record not found");
+        toast.error("No se encontró un registro de empleado para tu usuario.");
+        loading.value = false;
+        return;
       }
 
       const url = period
