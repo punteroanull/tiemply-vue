@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import api from "../services/api";
 import { useToast } from "vue-toastification";
+// Note: snake_case to camelCase conversion is handled globally in api.ts interceptor
 
 interface Role {
   id: string;
@@ -56,7 +57,7 @@ interface User {
   updated_at: string;
   // Relations
   role?: Role;
-  employee_records?: Employee[];
+  employeeRecords?: Employee[];
   companies?: Company[];
 }
 
@@ -86,11 +87,11 @@ export const useAuthStore = defineStore("auth", () => {
   const currentUser = computed(() => user.value);
 
   const currentEmployee = computed(() => {
-    if (!user.value?.employee_records?.length) return null;
+    if (!user.value?.employeeRecords?.length) return null;
     // Return the first active employee record or the first one if no active records
     return (
-      user.value.employee_records.find((emp) => emp.active) ||
-      user.value.employee_records[0]
+      user.value.employeeRecords.find((emp) => emp.active) ||
+      user.value.employeeRecords[0]
     );
   });
 
@@ -132,17 +133,21 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const response = await api.post("/login", credentials);
 
-      if (response.data.token) {
-        token.value = response.data.token;
-        localStorage.setItem("token", response.data.token);
+      // Backend uses ApiResponse trait: { success: true, data: { token, user } }
+      // Axios response is in response.data, so actual data is in response.data.data
+      let responseData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        responseData = response.data.data;
+      } else {
+        responseData = response.data;
+      }
 
-        // If user data is returned in login response, use it
-        if (response.data.user) {
-          user.value = response.data.user;
-        } else {
-          // Otherwise fetch user data
-          await fetchCurrentUser();
-        }
+      if (responseData.token) {
+        token.value = responseData.token;
+        localStorage.setItem("token", responseData.token);
+
+        // Always fetch full user data from /me to get employee_records and other relations
+        await fetchCurrentUser();
 
         toast.success("Successfully logged in");
         return true;
@@ -167,17 +172,21 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const response = await api.post("/register", data);
 
-      if (response.data.token) {
-        token.value = response.data.token;
-        localStorage.setItem("token", response.data.token);
+      // Backend uses ApiResponse trait: { success: true, data: { token, user } }
+      // Axios response is in response.data, so actual data is in response.data.data
+      let responseData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        responseData = response.data.data;
+      } else {
+        responseData = response.data;
+      }
 
-        // If user data is returned in register response, use it
-        if (response.data.user) {
-          user.value = response.data.user;
-        } else {
-          // Otherwise fetch user data
-          await fetchCurrentUser();
-        }
+      if (responseData.token) {
+        token.value = responseData.token;
+        localStorage.setItem("token", responseData.token);
+
+        // Always fetch full user data from /me to get employee_records and other relations
+        await fetchCurrentUser();
 
         toast.success("Registration successful");
         return true;
@@ -202,7 +211,14 @@ export const useAuthStore = defineStore("auth", () => {
 
     try {
       const response = await api.get("/me");
-      user.value = response.data;
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      // Note: snake_case to camelCase conversion is handled by api.ts interceptor
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        user.value = response.data.data;
+      } else {
+        user.value = response.data;
+      }
       return user.value;
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -225,8 +241,18 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const response = await api.put("/profile", profileData);
 
-      if (response.data) {
-        user.value = { ...user.value, ...response.data };
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      // Note: snake_case to camelCase conversion is handled by api.ts interceptor
+      let responseData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        responseData = response.data.data;
+      } else {
+        responseData = response.data;
+      }
+
+      if (responseData) {
+        user.value = { ...user.value, ...responseData };
         toast.success("Profile updated successfully");
         return true;
       }
@@ -286,16 +312,16 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function belongsToCompany(companyId: string): boolean {
-    if (!user.value?.employee_records) return false;
-    return user.value.employee_records.some(
+    if (!user.value?.employeeRecords) return false;
+    return user.value.employeeRecords.some(
       (emp) => emp.company_id === companyId
     );
   }
 
   function getEmployeeForCompany(companyId: string): Employee | null {
-    if (!user.value?.employee_records) return null;
+    if (!user.value?.employeeRecords) return null;
     return (
-      user.value.employee_records.find((emp) => emp.company_id === companyId) ||
+      user.value.employeeRecords.find((emp) => emp.company_id === companyId) ||
       null
     );
   }

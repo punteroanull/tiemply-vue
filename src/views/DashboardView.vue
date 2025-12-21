@@ -5,8 +5,19 @@ import { useWorkStatusStore } from "../stores/workStatus";
 import { useWorkLogsStore } from "../stores/workLogs";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-//import { format, subDays, addDays } from "date-fns";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import StatusBadge from '../components/StatusBadge.vue';
+
+// Safe date formatting helper
+function formatDate(dateValue: string | undefined | null, formatStr: string): string {
+  if (!dateValue) return '-';
+  try {
+    const date = parseISO(dateValue);
+    return format(date, formatStr);
+  } catch {
+    return '-';
+  }
+}
 
 const router = useRouter();
 const workStatusStore = useWorkStatusStore();
@@ -75,63 +86,60 @@ function navigateToNewRequest() {
       <div class="card">
         <div class="flex justify-between items-start mb-4">
           <h2 class="text-lg font-medium text-neutral-800">Current Status</h2>
-          <span
-            :class="[
-              'badge',
-              workStatusStore.isCheckedIn ? 'badge-success' : 'badge-info',
-            ]"
-          >
-            {{ workStatusStore.isCheckedIn ? "Working" : "Not working" }}
-          </span>
+          <StatusBadge :state="workStatusStore.currentState" />
         </div>
 
         <div class="space-y-4">
-          <div
-            v-if="workStatusStore.isCheckedIn"
-            class="flex items-center text-secondary-700"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                clip-rule="evenodd"
-              />
+          <!-- Working State -->
+          <div v-if="workStatusStore.currentState === 'working'" class="flex items-center text-green-700">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
-              <p class="text-sm text-neutral-600">Checked in at</p>
-              <p class="font-semibold">
-                {{ workStatusStore.formattedLastCheckIn }}
+              <p class="text-sm text-neutral-600">Working since</p>
+              <p class="font-semibold">{{ workStatusStore.formattedLastCheckIn }}</p>
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-green-600 mt-1">
+                Duration: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
           </div>
-          <div
-            v-else-if="workStatusStore.formattedLastCheckOut"
-            class="flex items-center text-neutral-700"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                clip-rule="evenodd"
-              />
+
+          <!-- On Break State -->
+          <div v-else-if="workStatusStore.currentState === 'on_break'" class="flex items-center text-amber-700">
+            <span class="text-2xl mr-2">☕</span>
+            <div>
+              <p class="text-sm text-neutral-600">On break</p>
+              <p class="font-semibold">Started at {{ workStatusStore.formattedLastCheckOut }}</p>
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-amber-600 mt-1">
+                Break time: {{ workStatusStore.formattedCurrentDuration }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Offsite State -->
+          <div v-else-if="workStatusStore.currentState === 'offsite'" class="flex items-center text-blue-700">
+            <span class="text-2xl mr-2">🚗</span>
+            <div>
+              <p class="text-sm text-neutral-600">Offsite</p>
+              <p class="font-semibold">Left at {{ workStatusStore.formattedLastCheckOut }}</p>
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-blue-600 mt-1">
+                Time offsite: {{ workStatusStore.formattedCurrentDuration }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Not Working State -->
+          <div v-else-if="workStatusStore.formattedLastCheckOut" class="flex items-center text-neutral-700">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
               <p class="text-sm text-neutral-600">Last checked out</p>
-              <p class="font-semibold">
-                {{ workStatusStore.formattedLastCheckOut }}
-              </p>
+              <p class="font-semibold">{{ workStatusStore.formattedLastCheckOut }}</p>
             </div>
           </div>
+
+          <!-- Never Checked In -->
           <div v-else class="text-neutral-600">
             <p>You haven't checked in today.</p>
           </div>
@@ -154,13 +162,13 @@ function navigateToNewRequest() {
           <div class="flex justify-between mb-2">
             <span class="text-neutral-600">Total hours</span>
             <span class="font-semibold">{{
-              workLogsStore.weeklyReport.total_duration || "0:00"
+              workLogsStore.weeklyReport.totalDuration || "0:00"
             }}</span>
           </div>
           <div class="flex justify-between">
             <span class="text-neutral-600">Days worked</span>
             <span class="font-semibold"
-              >{{ workLogsStore.weeklyReport.total_days || 0 }}/5</span
+              >{{ workLogsStore.weeklyReport.totalDays || 0 }}/5</span
             >
           </div>
 
@@ -170,13 +178,13 @@ function navigateToNewRequest() {
                 <div
                   class="bg-primary-600 h-2 rounded-full"
                   :style="`width: ${Math.min(
-                    (workLogsStore.weeklyReport.total_days || 0) * 20,
+                    (workLogsStore.weeklyReport.totalDays || 0) * 20,
                     100
                   )}%`"
                 ></div>
               </div>
               <span class="text-sm text-neutral-600 ml-2"
-                >{{ (workLogsStore.weeklyReport.total_days || 0) * 20 }}%</span
+                >{{ (workLogsStore.weeklyReport.totalDays || 0) * 20 }}%</span
               >
             </div>
           </div>
@@ -217,8 +225,8 @@ function navigateToNewRequest() {
                 <span class="badge-warning">Pending</span>
               </div>
               <div class="text-sm text-neutral-600 mt-1">
-                {{ format(new Date(request.start_date), "MMM d, yyyy") }} -
-                {{ format(new Date(request.end_date), "MMM d, yyyy") }}
+                {{ formatDate(request.startDate, "MMM d, yyyy") }} -
+                {{ formatDate(request.endDate, "MMM d, yyyy") }}
               </div>
             </li>
           </ul>
@@ -277,45 +285,60 @@ function navigateToNewRequest() {
             <span>View work logs</span>
           </button>
 
-          <button
-            v-if="!workStatusStore.isCheckedIn"
-            @click="workStatusStore.checkIn"
-            class="flex items-center p-3 bg-secondary-50 border border-secondary-200 rounded-md hover:bg-secondary-100 transition-colors text-secondary-700 sm:col-span-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+          <!-- Quick Actions based on state -->
+          <template v-if="workStatusStore.currentState === 'not_working'">
+            <button
+              @click="workStatusStore.startShift"
+              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Check in for today</span>
-          </button>
+              <span class="text-xl mr-2">▶️</span>
+              <span>Start your shift</span>
+            </button>
+          </template>
 
-          <button
-            v-else
-            @click="workStatusStore.checkOut"
-            class="flex items-center p-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-red-700 sm:col-span-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
+          <template v-else-if="workStatusStore.currentState === 'working'">
+            <button
+              @click="workStatusStore.startBreak"
+              class="flex items-center p-3 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors text-amber-700"
             >
-              <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clip-rule="evenodd"
-              />
-            </svg>
-            <span>Check out</span>
-          </button>
+              <span class="text-xl mr-2">☕</span>
+              <span>Take a break</span>
+            </button>
+            <button
+              @click="workStatusStore.startOffsite"
+              class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors text-blue-700"
+            >
+              <span class="text-xl mr-2">🚗</span>
+              <span>Go offsite</span>
+            </button>
+            <button
+              @click="workStatusStore.endShift"
+              class="flex items-center p-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-red-700 sm:col-span-2"
+            >
+              <span class="text-xl mr-2">⏹️</span>
+              <span>End your shift</span>
+            </button>
+          </template>
+
+          <template v-else-if="workStatusStore.currentState === 'on_break'">
+            <button
+              @click="workStatusStore.endBreak"
+              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
+            >
+              <span class="text-xl mr-2">↩️</span>
+              <span>Return from break</span>
+            </button>
+          </template>
+
+          <template v-else-if="workStatusStore.currentState === 'offsite'">
+            <button
+              @click="workStatusStore.endOffsite"
+              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
+            >
+              <span class="text-xl mr-2">🏢</span>
+              <span>Return to office</span>
+            </button>
+          </template>
         </div>
       </div>
     </div>

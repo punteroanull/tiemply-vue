@@ -13,21 +13,27 @@ import {
   type GeolocationData,
   type GeolocationError,
 } from "../utils/geolocation";
+import type {
+  WorkLogCategory,
+  WorkState,
+} from '../types';
 
 interface WorkStatus {
-  checked_in: boolean;
-  last_check_in?: string;
-  last_check_out?: string;
-  current_duration?: string;
+  checkedIn: boolean;
+  currentCategory?: WorkLogCategory;
+  currentState?: WorkState;
+  lastCheckIn?: string;
+  lastCheckOut?: string;
+  currentDuration?: string;
 }
 
 interface CompanySettings {
-  geolocation_enabled?: boolean;
-  geolocation_required?: boolean;
-  geolocation_radius?: number;
-  office_latitude?: number;
-  office_longitude?: number;
-  office_address?: string;
+  geolocationEnabled?: boolean;
+  geolocationRequired?: boolean;
+  geolocationRadius?: number;
+  officeLatitude?: number;
+  officeLongitude?: number;
+  officeAddress?: string;
 }
 
 export const useWorkStatusStore = defineStore("workStatus", () => {
@@ -41,6 +47,8 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   const refreshInterval = ref<number | null>(null);
   const durationUpdateInterval = ref<number | null>(null);
   const currentDuration = ref<string>("");
+  const currentState = ref<WorkState>('not_working');
+  const lastCategory = ref<WorkLogCategory | null>(null);
 
   // Geolocation states
   const gettingLocation = ref(false);
@@ -48,29 +56,29 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   const locationError = ref<GeolocationError | null>(null);
   const companySettings = ref<CompanySettings>({});
 
-  const isCheckedIn = computed(() => status.value?.checked_in || false);
+  const isCheckedIn = computed(() => status.value?.checkedIn || false);
   const isGeolocationEnabled = computed(
-    () => companySettings.value.geolocation_enabled || false
+    () => companySettings.value.geolocationEnabled || false
   );
   const isGeolocationRequired = computed(
-    () => companySettings.value.geolocation_required || false
+    () => companySettings.value.geolocationRequired || false
   );
   const isGeolocationAvailableComputed = computed(() =>
     isGeolocationAvailable()
   );
 
   const formattedLastCheckIn = computed(() => {
-    if (!status.value?.last_check_in) return "";
-    return format(new Date(status.value.last_check_in), "h:mm a");
+    if (!status.value?.lastCheckIn) return "";
+    return format(new Date(status.value.lastCheckIn), "h:mm a");
   });
 
   const formattedLastCheckOut = computed(() => {
-    if (!status.value?.last_check_out) return "";
-    return format(new Date(status.value.last_check_out), "h:mm a");
+    if (!status.value?.lastCheckOut) return "";
+    return format(new Date(status.value.lastCheckOut), "h:mm a");
   });
 
   const formattedCurrentDuration = computed(() => {
-    return currentDuration.value || status.value?.current_duration || "";
+    return currentDuration.value || status.value?.currentDuration || "";
   });
 
   const formattedLocation = computed(() => {
@@ -82,18 +90,49 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     );
   });
 
+  const canStartShift = computed(() => currentState.value === 'not_working');
+  const canEndShift = computed(() => currentState.value === 'working');
+  const canStartBreak = computed(() => currentState.value === 'working');
+  const canEndBreak = computed(() => currentState.value === 'on_break');
+  const canStartOffsite = computed(() => currentState.value === 'working');
+  const canEndOffsite = computed(() => currentState.value === 'offsite');
+
+  const stateLabel = computed(() => {
+    switch (currentState.value) {
+      case 'working': return 'Working';
+      case 'on_break': return 'On Break';
+      case 'offsite': return 'Offsite';
+      default: return 'Not Working';
+    }
+  });
+
+  const stateColor = computed(() => {
+    switch (currentState.value) {
+      case 'working': return 'green';
+      case 'on_break': return 'amber';
+      case 'offsite': return 'blue';
+      default: return 'gray';
+    }
+  });
+
   async function fetchCompanySettings() {
     try {
-      const employeeId = authStore.user?.employee_records?.[0]?.id;
+      const employeeId = authStore.user?.employeeRecords?.[0]?.id;
       if (!employeeId) return;
 
       const response = await api.get(
         `/employees/${employeeId}/company-settings`
       );
-      companySettings.value = response.data;
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        companySettings.value = response.data.data;
+      } else {
+        companySettings.value = response.data;
+      }
     } catch (error) {
       console.warn("Could not fetch company settings:", error);
-      companySettings.value = { geolocation_enabled: false };
+      companySettings.value = { geolocationEnabled: false };
     }
   }
 
@@ -150,24 +189,52 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     loading.value = true;
 
     try {
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
 
       const response = await api.get(`/worklogs/status/${employeeId}`);
-      const data = response.data;
+      // Backend uses ApiResponse trait: { success: true, data: { employee, status, category, lastActivity } }
+      // Axios response is in response.data, so actual data is in response.data.data
+      // Note: API response is now in camelCase (converted by api.ts interceptor)
+      let apiData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        apiData = response.data.data;
+      } else {
+        apiData = response.data;
+      }
+
+      // Determinar el estado actual basado en la categoria
+      let workState: WorkState = 'not_working';
+      const category = apiData.category as WorkLogCategory | undefined;
+
+      if (apiData.status === 'in') {
+        switch (category) {
+          case 'break_start':
+            workState = 'on_break';
+            break;
+          case 'offsite_start':
+            workState = 'offsite';
+            break;
+          default:
+            workState = 'working';
+        }
+      }
+
+      lastCategory.value = category || null;
+      currentState.value = workState;
 
       status.value = {
-        checked_in: data.status === "in",
-        last_check_in:
-          data.status === "in" ? data.last_activity?.time : undefined,
-        last_check_out:
-          data.status === "out" ? data.last_activity?.time : undefined,
-        current_duration: "",
+        checkedIn: apiData.status === 'in',
+        currentCategory: category,
+        currentState: workState,
+        lastCheckIn: apiData.status === 'in' ? apiData.lastActivity?.time : undefined,
+        lastCheckOut: apiData.status === 'out' ? apiData.lastActivity?.time : undefined,
+        currentDuration: '',
       };
 
-      if (status.value.checked_in && status.value.last_check_in) {
+      if (status.value.checkedIn && status.value.lastCheckIn) {
         updateCurrentDuration();
       }
     } catch (error: any) {
@@ -179,12 +246,12 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   }
 
   function updateCurrentDuration() {
-    if (!status.value?.checked_in || !status.value?.last_check_in) {
+    if (!status.value?.checkedIn || !status.value?.lastCheckIn) {
       currentDuration.value = "";
       return;
     }
 
-    const checkInTime = parseISO(status.value.last_check_in);
+    const checkInTime = parseISO(status.value.lastCheckIn);
     const now = new Date();
 
     currentDuration.value = formatDistance(checkInTime, now, {
@@ -192,13 +259,25 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     });
   }
 
-  async function checkIn() {
+  function getCategoryNote(category: WorkLogCategory): string {
+    const notes: Record<WorkLogCategory, string> = {
+      shift_start: 'Started shift via Tiemply app',
+      shift_end: 'Ended shift via Tiemply app',
+      break_start: 'Started break via Tiemply app',
+      break_end: 'Returned from break via Tiemply app',
+      offsite_start: 'Left office (offsite) via Tiemply app',
+      offsite_end: 'Returned to office via Tiemply app',
+    };
+    return notes[category];
+  }
+
+  async function checkIn(category: 'shift_start' | 'break_end' | 'offsite_end' = 'shift_start') {
     if (!authStore.user?.id) return false;
 
     checkingIn.value = true;
 
     try {
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
@@ -217,7 +296,8 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       // Preparar datos para el check-in
       const checkInData: any = {
         employee_id: employeeId,
-        notes: "Checked in via Tiemply app",
+        category: category,
+        notes: getCategoryNote(category),
       };
 
       // Añadir datos de ubicación si están disponibles
@@ -231,7 +311,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         });
       }
 
-      const response = await api.post("/worklogs/check-in", checkInData);
+      await api.post("/worklogs/check-in", checkInData);
 
       await fetchStatus();
 
@@ -265,13 +345,13 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     }
   }
 
-  async function checkOut() {
+  async function checkOut(category: 'shift_end' | 'break_start' | 'offsite_start' = 'shift_end') {
     if (!authStore.user?.id) return false;
 
     checkingOut.value = true;
 
     try {
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
@@ -290,8 +370,8 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       // Preparar datos para el check-out
       const checkOutData: any = {
         employee_id: employeeId,
-        category: "shift_end",
-        notes: "Checked out via Tiemply app",
+        category: category,
+        notes: getCategoryNote(category),
       };
 
       // Añadir datos de ubicación si están disponibles
@@ -305,7 +385,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         });
       }
 
-      const response = await api.post("/worklogs/check-out", checkOutData);
+      await api.post("/worklogs/check-out", checkOutData);
 
       await fetchStatus();
 
@@ -330,6 +410,30 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     } finally {
       checkingOut.value = false;
     }
+  }
+
+  async function startBreak() {
+    return await checkOut('break_start');
+  }
+
+  async function endBreak() {
+    return await checkIn('break_end');
+  }
+
+  async function startOffsite() {
+    return await checkOut('offsite_start');
+  }
+
+  async function endOffsite() {
+    return await checkIn('offsite_end');
+  }
+
+  async function endShift() {
+    return await checkOut('shift_end');
+  }
+
+  async function startShift() {
+    return await checkIn('shift_start');
   }
 
   function startRefreshInterval() {
@@ -375,7 +479,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     // Obtener estado actual
     await fetchStatus();
 
-    if (status.value?.checked_in) {
+    if (status.value?.checkedIn) {
       startRefreshInterval();
       startDurationUpdateInterval();
     }
@@ -387,25 +491,46 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   }
 
   function getEmployeeId() {
-    return authStore.user?.employee_records?.[0]?.id || null;
+    return authStore.user?.employeeRecords?.[0]?.id || null;
   }
 
-  function setOfflineCheckIn() {
+  function setOfflineCheckIn(category: 'shift_start' | 'break_end' | 'offsite_end' = 'shift_start') {
+    let workState: WorkState = 'working';
+    if (category === 'break_end') workState = 'working';
+    if (category === 'offsite_end') workState = 'working';
+
+    currentState.value = workState;
+    lastCategory.value = category;
+
     status.value = {
       ...status.value,
-      checked_in: true,
-      last_check_in: new Date().toISOString(),
+      checkedIn: true,
+      currentCategory: category,
+      currentState: workState,
+      lastCheckIn: new Date().toISOString(),
     };
     startDurationUpdateInterval();
   }
 
-  function setOfflineCheckOut() {
+  function setOfflineCheckOut(category: 'shift_end' | 'break_start' | 'offsite_start' = 'shift_end') {
+    let workState: WorkState = 'not_working';
+    if (category === 'break_start') workState = 'on_break';
+    if (category === 'offsite_start') workState = 'offsite';
+
+    currentState.value = workState;
+    lastCategory.value = category;
+
     status.value = {
       ...status.value,
-      checked_in: false,
-      last_check_out: new Date().toISOString(),
+      checkedIn: category !== 'shift_end',
+      currentCategory: category,
+      currentState: workState,
+      lastCheckOut: new Date().toISOString(),
     };
-    stopDurationUpdateInterval();
+
+    if (category === 'shift_end') {
+      stopDurationUpdateInterval();
+    }
   }
 
   return {
@@ -419,6 +544,10 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     formattedLastCheckOut,
     formattedCurrentDuration,
 
+    // Nuevos estados
+    currentState,
+    lastCategory,
+
     // Estado de geolocalización
     gettingLocation,
     locationData,
@@ -429,6 +558,16 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     isGeolocationAvailable: isGeolocationAvailableComputed,
     formattedLocation,
 
+    // Nuevos computed
+    canStartShift,
+    canEndShift,
+    canStartBreak,
+    canEndBreak,
+    canStartOffsite,
+    canEndOffsite,
+    stateLabel,
+    stateColor,
+
     // Métodos existentes
     fetchStatus,
     checkIn,
@@ -437,6 +576,14 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     getEmployeeId,
     setOfflineCheckIn,
     setOfflineCheckOut,
+
+    // Nuevos metodos
+    startBreak,
+    endBreak,
+    startOffsite,
+    endOffsite,
+    endShift,
+    startShift,
 
     // Métodos de geolocalización
     fetchCompanySettings,

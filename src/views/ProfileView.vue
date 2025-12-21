@@ -8,7 +8,7 @@ const authStore = useAuthStore();
 const workStatusStore = useWorkStatusStore();
 
 const user = computed(() => authStore.user);
-const employee = computed(() => authStore.user?.employee_records?.[0]);
+const employee = computed(() => authStore.user?.employeeRecords?.[0]);
 
 onMounted(async () => {
   // Asegurar que tenemos la configuración de la empresa

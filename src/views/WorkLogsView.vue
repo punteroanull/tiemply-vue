@@ -155,7 +155,7 @@ function formatTime(timeString: string | undefined) {
 
 // Helper to determine if a day has work logs
 function hasWorkLogs(day: any) {
-  return day.check_in || day.check_out;
+  return day.checkIn || day.checkOut;
 }
 
 onMounted(async () => {
@@ -334,12 +334,12 @@ onMounted(async () => {
         >
           <div>
             <span class="text-sm text-neutral-600">Total days: </span>
-            <span class="font-medium">{{ activeReport.total_days }}</span>
+            <span class="font-medium">{{ activeReport.totalDays }}</span>
           </div>
           <div>
             <span class="text-sm text-neutral-600">Total hours: </span>
             <span class="font-medium">{{
-              activeReport.total_duration || "0:00"
+              activeReport.totalDuration || "0:00"
             }}</span>
           </div>
         </div>
@@ -383,7 +383,7 @@ onMounted(async () => {
                   <div>
                     <span class="text-sm text-neutral-600">Check in:</span>
                     <span class="font-medium ml-1">{{
-                      day.check_in ? formatTime(day.check_in.time) : "-"
+                      day.checkIn ? formatTime(day.checkIn.time) : "-"
                     }}</span>
                   </div>
                 </div>
@@ -404,7 +404,7 @@ onMounted(async () => {
                   <div>
                     <span class="text-sm text-neutral-600">Check out:</span>
                     <span class="font-medium ml-1">{{
-                      day.check_out ? formatTime(day.check_out.time) : "-"
+                      day.checkOut ? formatTime(day.checkOut.time) : "-"
                     }}</span>
                   </div>
                 </div>
@@ -543,12 +543,12 @@ onMounted(async () => {
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                 >
-                  {{ day.check_in ? formatTime(day.check_in.time) : "-" }}
+                  {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                 >
-                  {{ day.check_out ? formatTime(day.check_out.time) : "-" }}
+                  {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm font-medium"
@@ -611,12 +611,12 @@ onMounted(async () => {
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                 >
-                  {{ day.check_in ? formatTime(day.check_in.time) : "-" }}
+                  {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                 >
-                  {{ day.check_out ? formatTime(day.check_out.time) : "-" }}
+                  {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm font-medium"

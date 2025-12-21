@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(npm install:*)",
+      "Bash(cmd /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm install -D vitest @vue/test-utils @pinia/testing jsdom happy-dom msw @vitest/coverage-v8\")",
+      "Bash(npm test:*)",
+      "Bash(wc:*)",
+      "Bash(docker ps:*)",
+      "Bash(docker exec:*)",
+      "Bash(curl:*)",
+      "Bash(npm run build:*)",
+      "Bash(where:*)",
+      "Bash(grep:*)",
+      "Bash(cmd /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")",
+      "Bash(cmd /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build 2>&1\")",
+      "Bash(npm.cmd run build:*)",
+      "Bash(docker restart:*)",
+      "Bash(docker logs:*)"
+    ]
+  }
+}

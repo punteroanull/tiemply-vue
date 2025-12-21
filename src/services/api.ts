@@ -1,4 +1,5 @@
 import axios from "axios";
+import { convertKeysToCamelCase } from "../utils/caseConverter";
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -23,9 +24,13 @@ api.interceptors.request.use(
   }
 );
 
-// Add a response interceptor to handle common errors
+// Add a response interceptor to handle common errors and convert snake_case to camelCase
 api.interceptors.response.use(
   (response) => {
+    // Convert all response data from snake_case (Laravel) to camelCase (TypeScript)
+    if (response.data) {
+      response.data = convertKeysToCamelCase(response.data);
+    }
     return response;
   },
   (error) => {

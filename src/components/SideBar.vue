@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter, useRoute } from "vue-router";
+import { useRoute } from "vue-router";
 
 const props = defineProps({
   isOpen: {
@@ -15,7 +15,6 @@ const props = defineProps({
 
 const emit = defineEmits(["close"]);
 
-const router = useRouter();
 const route = useRoute();
 
 const navigationItems = [

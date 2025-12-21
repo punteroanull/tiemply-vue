@@ -89,7 +89,7 @@ const statusIcon = computed(() => {
 
 async function requestLocationPermission() {
   try {
-    const position = await new Promise<GeolocationPosition>(
+    await new Promise<GeolocationPosition>(
       (resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: false,

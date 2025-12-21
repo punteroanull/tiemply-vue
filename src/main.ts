@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import './assets/main.css'
 import { setupOfflineListeners } from './utils/offlineManager'
+import { vClickOutside } from './directives/clickOutside'
 
 const app = createApp(App)
 
@@ -32,5 +33,7 @@ app.use(Toast, {
 
 // Configurar listeners para modo offline
 setupOfflineListeners()
+
+app.directive('click-outside', vClickOutside)
 
 app.mount('#app')

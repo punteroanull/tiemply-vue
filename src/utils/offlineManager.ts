@@ -1,27 +1,29 @@
 // src/utils/offlineManager.ts
 import { useWorkStatusStore } from "../stores/workStatus";
 
-interface PendingAction {
-  type: "check-in" | "check-out";
+const STORAGE_KEY = 'tiemply_pending_actions';
+
+export interface PendingAction {
+  type: 'check-in' | 'check-out' | 'break-start' | 'break-end' | 'offsite-start' | 'offsite-end';
   timestamp: number;
   employeeId: string;
-  data: any;
-  location?: string; // Datos de geolocalización si están disponibles
+  data: {
+    category?: string;
+    notes?: string;
+    location?: string;
+  };
 }
 
 // Guardar acciones pendientes en el almacenamiento local
 export function savePendingAction(action: PendingAction): void {
   const pendingActions = getPendingActions();
   pendingActions.push(action);
-  localStorage.setItem(
-    "tiemply_pending_actions",
-    JSON.stringify(pendingActions)
-  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingActions));
 }
 
 // Obtener acciones pendientes
 export function getPendingActions(): PendingAction[] {
-  const stored = localStorage.getItem("tiemply_pending_actions");
+  const stored = localStorage.getItem(STORAGE_KEY);
   return stored ? JSON.parse(stored) : [];
 }
 
@@ -29,70 +31,62 @@ export function getPendingActions(): PendingAction[] {
 export function removePendingAction(index: number): void {
   const pendingActions = getPendingActions();
   pendingActions.splice(index, 1);
-  localStorage.setItem(
-    "tiemply_pending_actions",
-    JSON.stringify(pendingActions)
-  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingActions));
 }
 
 // Limpiar todas las acciones pendientes
 export function clearPendingActions(): void {
-  localStorage.removeItem("tiemply_pending_actions");
+  localStorage.removeItem(STORAGE_KEY);
 }
 
 // Sincronizar acciones pendientes cuando se recupere la conexión
 export async function syncPendingActions(): Promise<void> {
-  if (!navigator.onLine) return;
+  const actions = getPendingActions();
+  if (actions.length === 0) return;
 
-  const workStatusStore = useWorkStatusStore();
-  const pendingActions = getPendingActions();
+  console.log(`Syncing ${actions.length} pending actions...`);
 
-  if (pendingActions.length === 0) return;
+  const successfulIds: number[] = [];
 
-  console.log(`Syncing ${pendingActions.length} pending actions...`);
-
-  for (let i = 0; i < pendingActions.length; i++) {
-    const action = pendingActions[i];
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
     try {
-      let success = false;
+      const workStatusStore = useWorkStatusStore();
 
-      if (action.type === "check-in") {
-        // Incluir datos de ubicación si están disponibles
-        const checkInData = {
-          ...action.data,
-          location: action.location || undefined,
-        };
-        success = await workStatusStore.checkIn();
-      } else if (action.type === "check-out") {
-        // Incluir datos de ubicación si están disponibles
-        const checkOutData = {
-          ...action.data,
-          location: action.location || undefined,
-        };
-        success = await workStatusStore.checkOut();
+      // Map action types to store methods
+      switch (action.type) {
+        case 'check-in':
+          await workStatusStore.checkIn(action.data.category as 'shift_start' | 'break_end' | 'offsite_end' || 'shift_start');
+          break;
+        case 'check-out':
+          await workStatusStore.checkOut(action.data.category as 'shift_end' | 'break_start' | 'offsite_start' || 'shift_end');
+          break;
+        case 'break-start':
+          await workStatusStore.startBreak();
+          break;
+        case 'break-end':
+          await workStatusStore.endBreak();
+          break;
+        case 'offsite-start':
+          await workStatusStore.startOffsite();
+          break;
+        case 'offsite-end':
+          await workStatusStore.endOffsite();
+          break;
       }
 
-      if (success) {
-        // Eliminar acción sincronizada exitosamente
-        removePendingAction(i);
-        i--; // Ajustar índice después de eliminar
-        console.log(`Successfully synced ${action.type} action`);
-      }
+      successfulIds.push(i);
+      console.log(`Successfully synced action: ${action.type}`);
     } catch (error) {
-      console.error(
-        `Error al sincronizar acción pendiente ${action.type}:`,
-        error
-      );
-      // No eliminar la acción si falla, para reintentarlo más tarde
+      console.error(`Failed to sync action ${action.type}:`, error);
     }
   }
 
-  const remainingActions = getPendingActions();
-  if (remainingActions.length === 0) {
-    console.log("All pending actions synchronized successfully");
-  } else {
-    console.log(`${remainingActions.length} actions remain pending`);
-  }
+  // Remove successful actions
+  const remainingActions = actions.filter((_, index) => !successfulIds.includes(index));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(remainingActions));
+
+  console.log(`Sync complete. ${successfulIds.length} synced, ${remainingActions.length} remaining.`);
 }
 
 // Escuchar eventos de conexión

@@ -1,400 +1,333 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { useToast } from "vue-toastification";
-import { useWorkStatusStore } from "../stores/workStatus";
-import { savePendingAction } from "../utils/offlineManager";
+import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { useOnline } from '@vueuse/core';
+import { useToast } from 'vue-toastification';
+import { useWorkStatusStore } from '../stores/workStatus';
+import { savePendingAction } from '../utils/offlineManager';
+import StatusBadge from './StatusBadge.vue';
+import type { WorkLogCategory } from '../types';
 
-const props = defineProps({
-  isCheckedIn: { type: Boolean, required: true },
-  isLoading: { type: Boolean, default: false },
-  currentDuration: { type: String, default: "" },
-  lastCheckInTime: { type: String, default: "" },
+const toast = useToast();
+const workStatusStore = useWorkStatusStore();
+const isOnline = useOnline();
+
+const isMenuOpen = ref(false);
+
+const isLoading = computed(() =>
+  workStatusStore.checkingIn || workStatusStore.checkingOut || workStatusStore.gettingLocation
+);
+
+// Actions based on current state
+const availableActions = computed(() => {
+  const state = workStatusStore.currentState;
+
+  if (state === 'not_working') {
+    return [{
+      id: 'start_shift',
+      label: 'Start Shift',
+      icon: '▶️',
+      category: 'shift_start' as const,
+      type: 'check-in' as const,
+      colorClass: 'text-green-600 hover:bg-green-50'
+    }];
+  }
+
+  if (state === 'working') {
+    return [
+      {
+        id: 'start_break',
+        label: 'Start Break',
+        icon: '☕',
+        category: 'break_start' as const,
+        type: 'check-out' as const,
+        colorClass: 'text-amber-600 hover:bg-amber-50'
+      },
+      {
+        id: 'start_offsite',
+        label: 'Go Offsite',
+        icon: '🚗',
+        category: 'offsite_start' as const,
+        type: 'check-out' as const,
+        colorClass: 'text-blue-600 hover:bg-blue-50'
+      },
+      {
+        id: 'end_shift',
+        label: 'End Shift',
+        icon: '⏹️',
+        category: 'shift_end' as const,
+        type: 'check-out' as const,
+        colorClass: 'text-red-600 hover:bg-red-50'
+      }
+    ];
+  }
+
+  if (state === 'on_break') {
+    return [{
+      id: 'end_break',
+      label: 'Return from Break',
+      icon: '↩️',
+      category: 'break_end' as const,
+      type: 'check-in' as const,
+      colorClass: 'text-green-600 hover:bg-green-50'
+    }];
+  }
+
+  if (state === 'offsite') {
+    return [{
+      id: 'end_offsite',
+      label: 'Return to Office',
+      icon: '🏢',
+      category: 'offsite_end' as const,
+      type: 'check-in' as const,
+      colorClass: 'text-green-600 hover:bg-green-50'
+    }];
+  }
+
+  return [];
 });
 
-const emit = defineEmits(["check-in", "check-out"]);
-const toast = useToast();
-const showConfirmation = ref(false);
-const workStatusStore = useWorkStatusStore();
+// Button styling based on state
+const buttonColorClass = computed(() => {
+  switch (workStatusStore.currentState) {
+    case 'working': return 'bg-green-600 hover:bg-green-700 focus:ring-green-500';
+    case 'on_break': return 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-400';
+    case 'offsite': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-400';
+    default: return 'bg-gray-600 hover:bg-gray-700 focus:ring-gray-500';
+  }
+});
 
-function handleClick() {
-  if (props.isLoading || workStatusStore.gettingLocation) return;
-
-  if (props.isCheckedIn) {
-    showConfirmation.value = true;
-  } else {
-    handleCheckIn();
+function toggleMenu() {
+  if (!isLoading.value) {
+    isMenuOpen.value = !isMenuOpen.value;
   }
 }
 
-async function handleCheckIn() {
-  if (!navigator.onLine) {
-    // Guardar para sincronización posterior
-    const employeeId = workStatusStore.getEmployeeId();
-    if (employeeId) {
-      savePendingAction({
-        type: "check-in",
-        timestamp: Date.now(),
-        employeeId,
-        data: { notes: "Checked in offline via Tiemply app" },
-      });
-      toast.info("Saved check-in for syncing when connection is restored");
-      // Actualizar UI temporalmente
-      workStatusStore.setOfflineCheckIn();
-    }
-  } else {
-    emit("check-in");
-  }
+function closeMenu() {
+  isMenuOpen.value = false;
 }
 
-async function confirmCheckOut() {
-  if (!navigator.onLine) {
-    // Guardar para sincronización posterior
+async function handleAction(action: {
+  category: WorkLogCategory;
+  type: 'check-in' | 'check-out';
+  label: string;
+}) {
+  closeMenu();
+
+  if (!isOnline.value) {
+    // Save for offline sync
     const employeeId = workStatusStore.getEmployeeId();
     if (employeeId) {
       savePendingAction({
-        type: "check-out",
+        type: action.type,
         timestamp: Date.now(),
         employeeId,
         data: {
-          category: "shift_end",
-          notes: "Checked out offline via Tiemply app",
-        },
+          category: action.category,
+          notes: `${action.label} offline via Tiemply app`
+        }
       });
-      toast.info("Saved check-out for syncing when connection is restored");
-      // Actualizar UI temporalmente
-      workStatusStore.setOfflineCheckOut();
+      toast.info('Saved for syncing when connection is restored');
+
+      // Update UI temporarily
+      if (action.type === 'check-in') {
+        workStatusStore.setOfflineCheckIn(action.category as 'shift_start' | 'break_end' | 'offsite_end');
+      } else {
+        workStatusStore.setOfflineCheckOut(action.category as 'shift_end' | 'break_start' | 'offsite_start');
+      }
     }
-  } else {
-    emit("check-out");
+    return;
   }
-  showConfirmation.value = false;
-}
 
-function cancelCheckOut() {
-  showConfirmation.value = false;
-  toast.info("Check-out cancelled");
-}
-
-const buttonClasses = computed(() => {
-  if (props.isCheckedIn) {
-    return "bg-error hover:bg-red-600";
-  } else {
-    return "bg-secondary-600 hover:bg-secondary-700";
-  }
-});
-
-const buttonText = computed(() => {
-  if (workStatusStore.gettingLocation) {
-    return "Getting location...";
-  } else if (props.isLoading) {
-    return props.isCheckedIn ? "Checking out..." : "Checking in...";
-  } else {
-    return props.isCheckedIn ? "Check out" : "Check in";
-  }
-});
-
-const isButtonDisabled = computed(() => {
-  return Boolean(
-    props.isLoading ||
-      workStatusStore.gettingLocation ||
-      (workStatusStore.isGeolocationRequired && !!workStatusStore.locationError)
-  );
-});
-
-const buttonIcon = computed(() => {
-  if (workStatusStore.gettingLocation || props.isLoading) {
-    return `<svg class="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-    </svg>`;
-  } else if (props.isCheckedIn) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" />
-    </svg>`;
-  } else {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd" />
-    </svg>`;
-  }
-});
-
-// Función para obtener el icono de geolocalización
-function getLocationIcon(hasLocation: boolean, hasError: boolean) {
-  if (hasError) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-    </svg>`;
-  } else if (hasLocation) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-    </svg>`;
-  } else {
-    return `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-      <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-    </svg>`;
+  // Execute online action
+  switch (action.category) {
+    case 'shift_start':
+      await workStatusStore.startShift();
+      break;
+    case 'shift_end':
+      await workStatusStore.endShift();
+      break;
+    case 'break_start':
+      await workStatusStore.startBreak();
+      break;
+    case 'break_end':
+      await workStatusStore.endBreak();
+      break;
+    case 'offsite_start':
+      await workStatusStore.startOffsite();
+      break;
+    case 'offsite_end':
+      await workStatusStore.endOffsite();
+      break;
   }
 }
+
+// Close menu on escape key
+function handleEscape(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    closeMenu();
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', handleEscape);
+});
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', handleEscape);
+});
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative" v-click-outside="closeMenu">
     <!-- Main Button -->
     <button
-      @click="handleClick"
-      :disabled="isButtonDisabled"
+      @click="toggleMenu"
+      :disabled="isLoading"
       :class="[
-        'text-white font-medium rounded-full shadow-lg flex items-center transition-all duration-300 transform hover:scale-105 focus:outline-none px-5 py-3 relative',
-        buttonClasses,
-        { 'opacity-75 cursor-not-allowed': isButtonDisabled },
+        'flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white font-medium',
+        'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
+        buttonColorClass,
+        isLoading ? 'opacity-75 cursor-wait' : 'hover:shadow-xl hover:scale-105'
       ]"
     >
-      <span v-html="buttonIcon"></span>
-      {{ buttonText }}
+      <!-- Loading Spinner -->
+      <svg
+        v-if="isLoading"
+        class="animate-spin h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+      </svg>
 
-      <!-- Indicador de geolocalización -->
+      <!-- State Label -->
+      <span v-else>{{ workStatusStore.stateLabel }}</span>
+
+      <!-- Duration -->
+      <span
+        v-if="workStatusStore.isCheckedIn && workStatusStore.formattedCurrentDuration"
+        class="text-sm opacity-90"
+      >
+        ({{ workStatusStore.formattedCurrentDuration }})
+      </span>
+
+      <!-- Dropdown Indicator -->
+      <svg
+        :class="['w-4 h-4 transition-transform', isMenuOpen ? 'rotate-180' : '']"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+      </svg>
+
+      <!-- Geolocation Indicator -->
       <div
         v-if="workStatusStore.isGeolocationEnabled"
-        class="absolute -top-1 -right-1 flex items-center justify-center"
+        class="absolute -top-1 -right-1"
         :title="
           workStatusStore.locationError
             ? `Location error: ${workStatusStore.locationError.message}`
             : workStatusStore.locationData
-            ? `Location: ${workStatusStore.formattedLocation}`
+            ? 'Location ready'
             : 'Location will be requested'
         "
       >
-        <div
-          v-html="
-            getLocationIcon(
-              !!workStatusStore.locationData,
-              !!workStatusStore.locationError
-            )
-          "
-          class="bg-white rounded-full p-1 shadow-sm"
-        ></div>
+        <span
+          :class="[
+            'flex h-3 w-3 rounded-full border-2 border-white shadow-sm',
+            workStatusStore.locationError ? 'bg-red-500' :
+            workStatusStore.locationData ? 'bg-green-500' :
+            workStatusStore.gettingLocation ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+          ]"
+        />
       </div>
     </button>
 
-    <!-- Geolocation Status Tooltip -->
-    <div
-      v-if="
-        workStatusStore.isGeolocationEnabled &&
-        (workStatusStore.gettingLocation ||
-          workStatusStore.locationData ||
-          workStatusStore.locationError)
-      "
-      class="absolute -top-20 right-0 bg-white rounded-lg shadow-lg px-3 py-2 text-sm text-neutral-800 whitespace-nowrap max-w-xs z-50"
+    <!-- Dropdown Menu -->
+    <transition
+      enter-active-class="transition ease-out duration-100"
+      enter-from-class="transform opacity-0 scale-95"
+      enter-to-class="transform opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-75"
+      leave-from-class="transform opacity-100 scale-100"
+      leave-to-class="transform opacity-0 scale-95"
     >
-      <!-- Getting location -->
       <div
-        v-if="workStatusStore.gettingLocation"
-        class="flex items-center text-blue-600"
+        v-if="isMenuOpen"
+        class="absolute bottom-full left-0 mb-2 w-56 rounded-xl bg-white shadow-xl ring-1 ring-black ring-opacity-5 overflow-hidden z-50"
       >
-        <svg
-          class="animate-spin h-4 w-4 mr-2"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle
-            class="opacity-25"
-            cx="12"
-            cy="12"
-            r="10"
-            stroke="currentColor"
-            stroke-width="4"
-          ></circle>
-          <path
-            class="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          ></path>
-        </svg>
-        Getting location...
-      </div>
-
-      <!-- Location obtained -->
-      <div v-else-if="workStatusStore.locationData" class="text-green-600">
-        <div class="flex items-center mb-1">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4 mr-1"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          <span class="font-medium">Location ready</span>
-        </div>
-        <div class="text-xs text-neutral-600 break-words">
-          {{ workStatusStore.formattedLocation }}
-        </div>
-        <div
-          v-if="workStatusStore.locationData.address"
-          class="text-xs text-neutral-500 mt-1 break-words"
-        >
-          {{ workStatusStore.locationData.address }}
-        </div>
-      </div>
-
-      <!-- Location error -->
-      <div v-else-if="workStatusStore.locationError" class="text-red-600">
-        <div class="flex items-center mb-1">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-4 w-4 mr-1"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-              clip-rule="evenodd"
-            />
-          </svg>
-          <span class="font-medium">Location error</span>
-        </div>
-        <div class="text-xs text-neutral-600 break-words">
-          {{ workStatusStore.locationError.message }}
-        </div>
-        <div
-          v-if="!workStatusStore.isGeolocationRequired"
-          class="text-xs text-neutral-500 mt-1"
-        >
-          Will proceed without location
-        </div>
-      </div>
-
-      <div
-        class="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-2 h-2 bg-white"
-      ></div>
-    </div>
-
-    <!-- Work Duration Tooltip (only shown when checked in and no geolocation tooltip) -->
-    <div
-      v-if="
-        isCheckedIn &&
-        currentDuration &&
-        !showConfirmation &&
-        !workStatusStore.gettingLocation &&
-        !workStatusStore.locationData &&
-        !workStatusStore.locationError
-      "
-      class="absolute -top-12 right-0 bg-white rounded-lg shadow-lg px-3 py-2 text-sm text-neutral-800 whitespace-nowrap"
-    >
-      <div class="flex items-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="h-4 w-4 text-secondary-600 mr-1"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-        >
-          <path
-            fill-rule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-            clip-rule="evenodd"
-          />
-        </svg>
-        <span
-          >Working for:
-          <span class="font-bold">{{ currentDuration }}</span></span
-        >
-      </div>
-      <div class="mt-1 text-xs text-neutral-500">
-        Since {{ lastCheckInTime }}
-      </div>
-      <div
-        class="absolute bottom-0 right-6 transform translate-y-1/2 rotate-45 w-2 h-2 bg-white"
-      ></div>
-    </div>
-
-    <!-- Check-out Confirmation Modal -->
-    <div
-      v-if="showConfirmation"
-      class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50"
-    >
-      <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm mx-4">
-        <div class="text-center mb-4">
-          <div
-            class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-red-100 text-red-600 mb-4"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+        <!-- Status Header -->
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+          <div class="flex items-center justify-between">
+            <StatusBadge :state="workStatusStore.currentState" size="sm" />
+            <span
+              v-if="workStatusStore.formattedCurrentDuration"
+              class="text-xs text-gray-500"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <h3 class="text-lg font-semibold text-neutral-800">
-            Confirm Check-Out
-          </h3>
-          <p class="text-neutral-600 mt-2">
-            Are you sure you want to check out?
-            <span v-if="currentDuration" class="block mt-1 font-medium">
-              You've been working for {{ currentDuration }}
+              {{ workStatusStore.formattedCurrentDuration }}
             </span>
-          </p>
-
-          <!-- Location warning if geolocation is enabled -->
-          <div
-            v-if="workStatusStore.isGeolocationEnabled"
-            class="mt-3 p-2 bg-blue-50 rounded-md"
-          >
-            <div class="flex items-center text-blue-800 text-sm">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-4 w-4 mr-1"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-              <span>{{
-                workStatusStore.isGeolocationRequired
-                  ? "Location will be required"
-                  : "Location will be requested"
-              }}</span>
-            </div>
           </div>
         </div>
 
-        <div class="flex space-x-3">
+        <!-- Actions List -->
+        <div class="py-1">
           <button
-            @click="cancelCheckOut"
-            class="flex-1 py-2 border border-neutral-300 rounded-md text-neutral-700 bg-white hover:bg-neutral-50"
+            v-for="action in availableActions"
+            :key="action.id"
+            @click="handleAction(action)"
+            :disabled="isLoading"
+            :class="[
+              'w-full flex items-center gap-3 px-4 py-3 text-left transition-colors',
+              action.colorClass,
+              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+            ]"
           >
-            Cancel
+            <span class="text-lg">{{ action.icon }}</span>
+            <span class="font-medium">{{ action.label }}</span>
           </button>
-          <button
-            @click="confirmCheckOut"
-            class="flex-1 py-2 bg-error text-white rounded-md hover:bg-red-700"
-            :disabled="
-              !!(
-                workStatusStore.isGeolocationRequired &&
-                workStatusStore.locationError
-              )
-            "
+        </div>
+
+        <!-- Geolocation Info -->
+        <div
+          v-if="workStatusStore.isGeolocationEnabled"
+          class="px-4 py-2 bg-gray-50 border-t border-gray-200"
+        >
+          <div class="flex items-center gap-2 text-xs">
+            <span
+              :class="[
+                'w-2 h-2 rounded-full',
+                workStatusStore.locationError ? 'bg-red-500' :
+                workStatusStore.locationData ? 'bg-green-500' :
+                workStatusStore.gettingLocation ? 'bg-blue-500 animate-pulse' : 'bg-gray-400'
+              ]"
+            />
+            <span class="text-gray-500">
+              {{ workStatusStore.gettingLocation ? 'Getting location...' :
+                 workStatusStore.locationError ? 'Location error' :
+                 workStatusStore.locationData ? 'Location ready' : 'Location pending' }}
+            </span>
+          </div>
+          <div
+            v-if="workStatusStore.locationData && !workStatusStore.gettingLocation"
+            class="text-xs text-gray-400 mt-1 truncate"
           >
-            Check Out
-          </button>
+            {{ workStatusStore.formattedLocation }}
+          </div>
+        </div>
+
+        <!-- Offline Indicator -->
+        <div
+          v-if="!isOnline"
+          class="px-4 py-2 bg-amber-50 border-t border-amber-200"
+        >
+          <div class="flex items-center gap-2 text-xs text-amber-700">
+            <span class="w-2 h-2 rounded-full bg-amber-500" />
+            Offline - actions will sync later
+          </div>
         </div>
       </div>
-    </div>
+    </transition>
   </div>
 </template>

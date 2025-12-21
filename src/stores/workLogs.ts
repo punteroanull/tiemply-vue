@@ -7,28 +7,28 @@ import { useAuthStore } from "./auth";
 interface WorkLog {
   id: string;
   uuid: string;
-  employee_id: string;
+  employeeId: string;
   date: string;
   time: string;
   type: "check_in" | "check_out";
   category?: string;
-  paired_log_id?: string;
+  pairedLogId?: string;
   notes?: string;
-  formatted_duration?: string;
+  formattedDuration?: string;
 }
 
 interface WorkLogPair {
   date: string;
-  check_in?: WorkLog;
-  check_out?: WorkLog;
+  checkIn?: WorkLog;
+  checkOut?: WorkLog;
   duration?: string;
   logs: WorkLog[];
 }
 
 interface WorkLogReport {
   days: WorkLogPair[];
-  total_duration: string;
-  total_days: number;
+  totalDuration: string;
+  totalDays: number;
 }
 
 export const useWorkLogsStore = defineStore("workLogs", () => {
@@ -48,7 +48,7 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     loading.value = true;
 
     try {
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
@@ -57,44 +57,52 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
         ? `/worklogs/daily-report/${employeeId}/${period}`
         : `/worklogs/daily-report/${employeeId}`;
 
-      console.log("Fetching daily report from URL:", url);
       const response = await api.get(url);
 
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      let apiData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        apiData = response.data.data;
+      } else {
+        apiData = response.data;
+      }
+
       // Transform the API response into the expected format
+      // Note: API response is now in camelCase (converted by api.ts interceptor)
       const transformedData = {
         days: [
           {
-            date: response.data.date,
-            check_in: response.data.shift?.start || null,
-            check_out: response.data.shift?.end || null,
-            duration: response.data.shift?.total_minutes
+            date: apiData.date,
+            checkIn: apiData.shift?.start || null,
+            checkOut: apiData.shift?.end || null,
+            duration: apiData.shift?.totalMinutes
               ? `${Math.abs(
-                  Math.floor(response.data.shift.total_minutes / 60)
+                  Math.floor(apiData.shift.totalMinutes / 60)
                 )}:${Math.abs(
-                  Math.floor(response.data.shift.total_minutes % 60)
+                  Math.floor(apiData.shift.totalMinutes % 60)
                 )}`
               : "0:00",
             logs:
-              response.data.all_logs?.map((log: any) => ({
+              apiData.allLogs?.map((log: any) => ({
                 id: log.id,
                 uuid: log.uuid,
-                employee_id: log.employee_id,
+                employeeId: log.employeeId,
                 date: log.date,
                 time: log.time,
                 type: log.type,
                 category: log.category,
-                paired_log_id: log.paired_log_id,
+                pairedLogId: log.pairedLogId,
                 notes: log.notes,
-                formatted_duration: log.formatted_duration,
+                formattedDuration: log.formattedDuration,
               })) || [],
           },
         ],
-        total_duration: response.data.total_work_time?.formatted || "0:00",
-        total_days: 1, // Assuming one day for daily report
+        totalDuration: apiData.totalWorkTime?.formatted || "0:00",
+        totalDays: 1, // Assuming one day for daily report
       };
 
       dailyReport.value = transformedData;
-      console.log("Transformed Daily Report:", dailyReport.value);
       return dailyReport.value;
     } catch (error) {
       console.error("Error fetching daily report:", error);
@@ -110,11 +118,7 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     loading.value = true;
 
     try {
-      // Agrega logs para depuración
-      console.log("authStore.user:", authStore.user);
-      console.log("employee_records:", authStore.user?.employee_records);
-
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         toast.error("No se encontró un registro de empleado para tu usuario.");
         loading.value = false;
@@ -125,35 +129,43 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
         ? `/worklogs/weekly-report/${employeeId}/${period}`
         : `/worklogs/weekly-report/${employeeId}`;
 
-      console.log("Fetching weekly report from URL:", url);
       const response = await api.get(url);
 
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      let apiData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        apiData = response.data.data;
+      } else {
+        apiData = response.data;
+      }
+
       // Transform the API response into the expected format
+      // Note: API response is now in camelCase (converted by api.ts interceptor)
       const transformedData = {
-        days: response.data.days.map((day: any) => ({
+        days: apiData.days.map((day: any) => ({
           date: day.date,
-          check_in: day.shift?.start_time
+          checkIn: day.shift?.startTime
             ? {
-                time: day.shift.start_time,
+                time: day.shift.startTime,
                 type: "check_in",
               }
             : null,
-          check_out: day.shift?.end_time
+          checkOut: day.shift?.endTime
             ? {
-                time: day.shift.end_time,
+                time: day.shift.endTime,
                 type: "check_out",
               }
             : null,
-          duration: day.work_time?.formatted || "0:00",
+          duration: day.workTime?.formatted || "0:00",
           status: day.status,
-          is_weekend: day.is_weekend,
+          isWeekend: day.isWeekend,
         })),
-        total_duration: response.data.summary.work_time?.formatted || "0:00",
-        total_days: response.data.days.length,
+        totalDuration: apiData.summary?.workTime?.formatted || "0:00",
+        totalDays: apiData.days?.length || 0,
       };
 
       weeklyReport.value = transformedData;
-      console.log("Transformed Weekly Report:", weeklyReport.value);
       return weeklyReport.value;
     } catch (error) {
       console.error("Error fetching weekly report:", error);
@@ -169,7 +181,7 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     loading.value = true;
 
     try {
-      const employeeId = authStore.user.employee_records?.[0]?.id;
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
@@ -179,41 +191,45 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
         url += `/${year}/${month}`;
       }
 
-      console.log("Fetching monthly report from URL:", url);
       const response = await api.get(url);
 
+      // Backend uses ApiResponse trait: { success: true, data: {...} }
+      // Axios response is in response.data, so actual data is in response.data.data
+      let apiData;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        apiData = response.data.data;
+      } else {
+        apiData = response.data;
+      }
+
       // Transform the API response into the expected format
+      // Note: API response is now in camelCase (converted by api.ts interceptor)
       const transformedData = {
-        days: response.data.days.map((day: any) => ({
+        days: apiData.days.map((day: any) => ({
           date: day.date,
-          check_in: day.shift?.start_time
+          checkIn: day.shift?.startTime
             ? {
-                time: day.shift.start_time,
+                time: day.shift.startTime,
                 type: "check_in",
               }
             : null,
-          check_out: day.shift?.end_time
+          checkOut: day.shift?.endTime
             ? {
-                time: day.shift.end_time,
+                time: day.shift.endTime,
                 type: "check_out",
               }
             : null,
-          duration: day.work_minutes
-            ? `${Math.abs(Math.floor(day.work_minutes / 60))}:${Math.abs(
-                Math.floor(
-                  response.data.shift.total_minutesday.work_minutes % 60
-                )
-              )}`
+          duration: day.workMinutes
+            ? `${Math.floor(day.workMinutes / 60)}:${String(day.workMinutes % 60).padStart(2, '0')}`
             : "0:00",
           status: day.status,
-          is_weekend: day.is_weekend,
+          isWeekend: day.isWeekend,
         })),
-        total_duration: response.data.summary.work_time?.formatted || "0:00",
-        total_days: response.data.days.length,
+        totalDuration: apiData.summary?.workTime?.formatted || "0:00",
+        totalDays: apiData.days?.length || 0,
       };
 
       monthlyReport.value = transformedData;
-      console.log("Transformed Monthly Report:", monthlyReport.value);
       return monthlyReport.value;
     } catch (error) {
       console.error("Error fetching monthly report:", error);
