@@ -4,7 +4,42 @@ import { ref, computed } from "vue";
 import api from "../services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "./auth";
-import { format, formatDistance, parseISO } from "date-fns";
+import { format, formatDistance, parseISO, isValid } from "date-fns";
+
+// Helper function to safely parse and validate a date string
+function parseAndValidateDate(dateValue: string | Date | undefined | null): Date | null {
+  if (!dateValue) return null;
+
+  // Si ya es un objeto Date
+  if (dateValue instanceof Date) {
+    return isValid(dateValue) ? dateValue : null;
+  }
+
+  if (typeof dateValue !== 'string') {
+    console.warn('parseAndValidateDate: received non-string value:', dateValue);
+    return null;
+  }
+
+  try {
+    // Intentar parsear como ISO
+    const parsed = parseISO(dateValue);
+    if (isValid(parsed)) {
+      return parsed;
+    }
+
+    // Fallback: intentar con new Date()
+    const fallbackDate = new Date(dateValue);
+    if (isValid(fallbackDate)) {
+      return fallbackDate;
+    }
+
+    console.warn('parseAndValidateDate: could not parse date:', dateValue);
+    return null;
+  } catch (error) {
+    console.warn('parseAndValidateDate: error parsing date:', dateValue, error);
+    return null;
+  }
+}
 import {
   getCurrentPosition,
   getAddressFromCoords,
@@ -68,13 +103,25 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   );
 
   const formattedLastCheckIn = computed(() => {
-    if (!status.value?.lastCheckIn) return "";
-    return format(new Date(status.value.lastCheckIn), "h:mm a");
+    try {
+      const date = parseAndValidateDate(status.value?.lastCheckIn);
+      if (!date) return "";
+      return format(date, "h:mm a");
+    } catch (error) {
+      console.warn('formattedLastCheckIn: error formatting date:', error);
+      return "";
+    }
   });
 
   const formattedLastCheckOut = computed(() => {
-    if (!status.value?.lastCheckOut) return "";
-    return format(new Date(status.value.lastCheckOut), "h:mm a");
+    try {
+      const date = parseAndValidateDate(status.value?.lastCheckOut);
+      if (!date) return "";
+      return format(date, "h:mm a");
+    } catch (error) {
+      console.warn('formattedLastCheckOut: error formatting date:', error);
+      return "";
+    }
   });
 
   const formattedCurrentDuration = computed(() => {
@@ -225,12 +272,26 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       lastCategory.value = category || null;
       currentState.value = workState;
 
+      // Validar y normalizar el tiempo de lastActivity
+      let lastActivityTime: string | undefined;
+      if (apiData.lastActivity?.time) {
+        try {
+          const parsedTime = parseAndValidateDate(apiData.lastActivity.time);
+          if (parsedTime && isValid(parsedTime)) {
+            lastActivityTime = parsedTime.toISOString();
+          }
+        } catch (parseError) {
+          console.warn('fetchStatus: error parsing lastActivity.time:', apiData.lastActivity.time, parseError);
+          lastActivityTime = undefined;
+        }
+      }
+
       status.value = {
         checkedIn: apiData.status === 'in',
         currentCategory: category,
         currentState: workState,
-        lastCheckIn: apiData.status === 'in' ? apiData.lastActivity?.time : undefined,
-        lastCheckOut: apiData.status === 'out' ? apiData.lastActivity?.time : undefined,
+        lastCheckIn: apiData.status === 'in' ? lastActivityTime : undefined,
+        lastCheckOut: apiData.status === 'out' ? lastActivityTime : undefined,
         currentDuration: '',
       };
 
@@ -246,17 +307,44 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   }
 
   function updateCurrentDuration() {
-    if (!status.value?.checkedIn || !status.value?.lastCheckIn) {
+    try {
+      if (!status.value?.checkedIn || !status.value?.lastCheckIn) {
+        currentDuration.value = "";
+        return;
+      }
+
+      const checkInTime = parseAndValidateDate(status.value.lastCheckIn);
+      if (!checkInTime || !isValid(checkInTime)) {
+        console.warn('updateCurrentDuration: invalid checkInTime from:', status.value.lastCheckIn);
+        currentDuration.value = "";
+        return;
+      }
+
+      const now = new Date();
+      if (!isValid(now)) {
+        currentDuration.value = "";
+        return;
+      }
+
+      // Validar que checkInTime no sea futuro
+      if (checkInTime.getTime() > now.getTime()) {
+        currentDuration.value = "";
+        return;
+      }
+
+      // Double-check que ambas fechas son válidas antes de formatDistance
+      if (isNaN(checkInTime.getTime()) || isNaN(now.getTime())) {
+        currentDuration.value = "";
+        return;
+      }
+
+      currentDuration.value = formatDistance(now, checkInTime, {
+        addSuffix: false,
+      });
+    } catch (error) {
+      console.warn('updateCurrentDuration: error calculating duration:', error);
       currentDuration.value = "";
-      return;
     }
-
-    const checkInTime = parseISO(status.value.lastCheckIn);
-    const now = new Date();
-
-    currentDuration.value = formatDistance(checkInTime, now, {
-      addSuffix: false,
-    });
   }
 
   function getCategoryNote(category: WorkLogCategory): string {
@@ -404,8 +492,20 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       return true;
     } catch (error: any) {
-      console.error("Check-out error:", error);
-      toast.error("Failed to check out. Please try again.");
+      if (error.response) {
+        const statusCode = error.response.status;
+        const errorMessage =
+          error.response.data?.message || "An error occurred";
+
+        if (statusCode === 422) {
+          toast.error(errorMessage);
+        } else {
+          toast.error(`Error ${statusCode}: ${errorMessage}`);
+        }
+      } else {
+        console.error("Check-out error:", error);
+        toast.error("Failed to check out. Please try again.");
+      }
       return false;
     } finally {
       checkingOut.value = false;

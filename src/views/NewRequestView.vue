@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-import { format, addDays } from "date-fns";
+import { format } from "date-fns";
 
 const router = useRouter();
 const absencesStore = useAbsencesStore();
@@ -27,7 +27,7 @@ const minDate = computed(() => format(new Date(), "yyyy-MM-dd"));
 
 // Get employee's remaining vacation days
 const remainingVacationDays = computed(() => {
-  return authStore.user?.employeeRecords?.[0]?.remainingVacationDays ?? 0;
+  return authStore.user?.employeeRecords?.[0]?.remaining_vacation_days ?? 0;
 });
 
 // Get selected absence type details
