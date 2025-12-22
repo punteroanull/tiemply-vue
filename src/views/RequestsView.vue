@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { useAbsencesStore } from "../stores/absences";
 import { format, parseISO } from "date-fns";
+import { enUS, es } from "date-fns/locale";
 import { useToast } from "vue-toastification";
 import api from "../services/api";
+
+const { t, locale } = useI18n();
 
 const router = useRouter();
 const absencesStore = useAbsencesStore();
@@ -29,12 +33,15 @@ const showDeleteModal = ref(false);
 const requestToDelete = ref<string | null>(null);
 const isDeleting = ref(false);
 
+// Date locale
+const dateLocale = computed(() => locale.value === "es" ? es : enUS);
+
 // Safe date formatting helper
 function formatDate(dateValue: string | undefined | null): string {
   if (!dateValue) return "-";
   try {
     const date = parseISO(dateValue);
-    return format(date, "MMM d, yyyy");
+    return format(date, "MMM d, yyyy", { locale: dateLocale.value });
   } catch {
     return "-";
   }
@@ -56,11 +63,11 @@ function getStatusBadgeClass(status: string): string {
 function getStatusLabel(status: string): string {
   switch (status) {
     case "pending":
-      return "Pending";
+      return t("requests.pending");
     case "approved":
-      return "Approved";
+      return t("requests.approved");
     case "rejected":
-      return "Rejected";
+      return t("requests.rejected");
     default:
       return status;
   }
@@ -86,12 +93,12 @@ async function confirmDelete() {
   isDeleting.value = true;
   try {
     await api.delete(`/requests/${requestToDelete.value}`);
-    toast.success("Request cancelled successfully");
+    toast.success(t("requests.cancelSuccess"));
     await absencesStore.fetchAbsenceRequests();
     closeDeleteModal();
   } catch (error: any) {
     console.error("Error deleting request:", error);
-    toast.error(error.response?.data?.message || "Failed to cancel request");
+    toast.error(error.response?.data?.message || t("requests.cancelError"));
   } finally {
     isDeleting.value = false;
   }
@@ -105,7 +112,7 @@ onMounted(async () => {
 <template>
   <div class="container mx-auto px-4 py-4">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-      <h1 class="text-2xl font-bold text-neutral-800">Absence Requests</h1>
+      <h1 class="text-2xl font-bold text-neutral-800">{{ $t('requests.title') }}</h1>
       <button
         @click="navigateToNewRequest"
         class="flex items-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors"
@@ -113,7 +120,7 @@ onMounted(async () => {
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
         </svg>
-        New Request
+        {{ $t('requests.newRequest') }}
       </button>
     </div>
 
@@ -125,28 +132,28 @@ onMounted(async () => {
           class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
           :class="statusFilter === 'all' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          All
+          {{ $t('requests.all') }}
         </button>
         <button
           @click="statusFilter = 'pending'"
           class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
           :class="statusFilter === 'pending' ? 'bg-amber-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          Pending
+          {{ $t('requests.pending') }}
         </button>
         <button
           @click="statusFilter = 'approved'"
           class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
           :class="statusFilter === 'approved' ? 'bg-green-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          Approved
+          {{ $t('requests.approved') }}
         </button>
         <button
           @click="statusFilter = 'rejected'"
           class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
           :class="statusFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          Rejected
+          {{ $t('requests.rejected') }}
         </button>
       </div>
     </div>
@@ -163,9 +170,9 @@ onMounted(async () => {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       </div>
-      <h3 class="text-lg font-medium text-neutral-800 mb-2">No requests found</h3>
+      <h3 class="text-lg font-medium text-neutral-800 mb-2">{{ $t('requests.noRequests') }}</h3>
       <p class="text-neutral-600 mb-4">
-        {{ statusFilter === 'all' ? "You haven't submitted any absence requests yet." : `No ${statusFilter} requests found.` }}
+        {{ statusFilter === 'all' ? $t('requests.noRequestsYet') : $t('requests.noFilterResults', { status: statusFilter }) }}
       </p>
       <button
         @click="navigateToNewRequest"
@@ -174,7 +181,7 @@ onMounted(async () => {
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
           <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
         </svg>
-        Create your first request
+        {{ $t('requests.createFirst') }}
       </button>
     </div>
 
@@ -186,30 +193,30 @@ onMounted(async () => {
           <thead class="bg-neutral-50">
             <tr>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Type
+                {{ $t('requests.type') }}
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Dates
+                {{ $t('requests.dates') }}
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Days
+                {{ $t('requests.days') }}
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Status
+                {{ $t('absences.status') }}
               </th>
               <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Notes
+                {{ $t('workLogs.notes') }}
               </th>
               <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                Actions
+                {{ $t('requests.actions') }}
               </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-neutral-200">
             <tr v-for="request in filteredRequests" :key="request.id" class="hover:bg-neutral-50">
               <td class="px-6 py-4 whitespace-nowrap">
-                <span class="font-medium text-neutral-800">{{ request.absenceType?.name || "Absence" }}</span>
-                <span v-if="request.isPartial" class="ml-2 text-xs text-neutral-500">(Partial)</span>
+                <span class="font-medium text-neutral-800">{{ request.absenceType?.name || t('absences.absence') }}</span>
+                <span v-if="request.isPartial" class="ml-2 text-xs text-neutral-500">({{ $t('requests.partial') }})</span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
                 {{ formatDate(request.startDate) }}
@@ -218,7 +225,7 @@ onMounted(async () => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                {{ request.daysCount || 1 }} day(s)
+                {{ $t('requests.daysCount', { count: request.daysCount || 1 }) }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <span
@@ -231,7 +238,7 @@ onMounted(async () => {
               <td class="px-6 py-4 text-sm text-neutral-600 max-w-xs truncate">
                 {{ request.notes || "-" }}
                 <p v-if="request.status === 'rejected' && request.rejectionReason" class="text-red-600 text-xs mt-1">
-                  Reason: {{ request.rejectionReason }}
+                  {{ $t('requests.reason') }}: {{ request.rejectionReason }}
                 </p>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
@@ -240,7 +247,7 @@ onMounted(async () => {
                   @click="openDeleteModal(request.id)"
                   class="text-red-600 hover:text-red-800 font-medium"
                 >
-                  Cancel
+                  {{ $t('requests.cancel') }}
                 </button>
                 <span v-else class="text-neutral-400">-</span>
               </td>
@@ -254,8 +261,8 @@ onMounted(async () => {
         <div v-for="request in filteredRequests" :key="request.id" class="p-4">
           <div class="flex justify-between items-start mb-2">
             <div>
-              <span class="font-medium text-neutral-800">{{ request.absenceType?.name || "Absence" }}</span>
-              <span v-if="request.isPartial" class="ml-2 text-xs text-neutral-500">(Partial)</span>
+              <span class="font-medium text-neutral-800">{{ request.absenceType?.name || t('absences.absence') }}</span>
+              <span v-if="request.isPartial" class="ml-2 text-xs text-neutral-500">({{ $t('requests.partial') }})</span>
             </div>
             <span
               class="px-2 py-1 text-xs font-medium rounded-full"
@@ -269,18 +276,18 @@ onMounted(async () => {
             <span v-if="request.startDate !== request.endDate">
               - {{ formatDate(request.endDate) }}
             </span>
-            <span class="ml-2">({{ request.daysCount || 1 }} day(s))</span>
+            <span class="ml-2">({{ $t('requests.daysCount', { count: request.daysCount || 1 }) }})</span>
           </div>
           <p v-if="request.notes" class="text-sm text-neutral-500 mb-2">{{ request.notes }}</p>
           <p v-if="request.status === 'rejected' && request.rejectionReason" class="text-sm text-red-600 mb-2">
-            Reason: {{ request.rejectionReason }}
+            {{ $t('requests.reason') }}: {{ request.rejectionReason }}
           </p>
           <button
             v-if="request.status === 'pending'"
             @click="openDeleteModal(request.id)"
             class="text-sm text-red-600 hover:text-red-800 font-medium"
           >
-            Cancel request
+            {{ $t('requests.cancelRequest') }}
           </button>
         </div>
       </div>
@@ -300,10 +307,10 @@ onMounted(async () => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h3 class="ml-3 text-lg font-medium text-neutral-900">Cancel Request</h3>
+            <h3 class="ml-3 text-lg font-medium text-neutral-900">{{ $t('requests.cancelConfirmTitle') }}</h3>
           </div>
           <p class="text-neutral-600 mb-6">
-            Are you sure you want to cancel this absence request? This action cannot be undone.
+            {{ $t('requests.cancelConfirmMessage') }}
           </p>
           <div class="flex justify-end space-x-3">
             <button
@@ -311,15 +318,15 @@ onMounted(async () => {
               :disabled="isDeleting"
               class="px-4 py-2 bg-neutral-100 text-neutral-700 font-medium rounded-md hover:bg-neutral-200 transition-colors disabled:opacity-50"
             >
-              Keep Request
+              {{ $t('requests.keepRequest') }}
             </button>
             <button
               @click="confirmDelete"
               :disabled="isDeleting"
               class="px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
             >
-              <span v-if="isDeleting">Cancelling...</span>
-              <span v-else>Yes, Cancel It</span>
+              <span v-if="isDeleting">{{ $t('requests.cancelling') }}</span>
+              <span v-else>{{ $t('requests.yesCancelIt') }}</span>
             </button>
           </div>
         </div>

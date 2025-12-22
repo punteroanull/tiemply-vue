@@ -343,6 +343,36 @@ export const useAuthStore = defineStore("auth", () => {
       .join("");
   }
 
+  // Locale management
+  const locale = ref<string>(localStorage.getItem("locale") || "en");
+
+  async function updateLocale(newLocale: string): Promise<boolean> {
+    try {
+      // Save to localStorage immediately for better UX
+      localStorage.setItem("locale", newLocale);
+      locale.value = newLocale;
+
+      // If user is authenticated, save preference to backend
+      if (token.value) {
+        await api.put("/user/locale", { locale: newLocale });
+      }
+
+      return true;
+    } catch (err) {
+      console.error("Error updating locale:", err);
+      return false;
+    }
+  }
+
+  function loadUserLocale(): void {
+    // Load locale from user data if available
+    const userLocale = (user.value as any)?.locale;
+    if (userLocale && ["es", "en"].includes(userLocale)) {
+      locale.value = userLocale;
+      localStorage.setItem("locale", userLocale);
+    }
+  }
+
   return {
     // State
     user,
@@ -378,5 +408,10 @@ export const useAuthStore = defineStore("auth", () => {
     getEmployeeForCompany,
     getDisplayName,
     getUserInitials,
+
+    // Locale
+    locale,
+    updateLocale,
+    loadUserLocale,
   };
 });

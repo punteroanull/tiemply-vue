@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute } from "vue-router";
+import { useI18n } from "vue-i18n";
+
+const { t } = useI18n();
 
 const props = defineProps({
   isOpen: {
@@ -17,13 +20,13 @@ const emit = defineEmits(["close"]);
 
 const route = useRoute();
 
-const navigationItems = [
-  { name: "Dashboard", path: "/", icon: "home" },
-  { name: "Work Logs", path: "/work-logs", icon: "clock" },
-  { name: "Absences", path: "/absences", icon: "calendar" },
-  { name: "Requests", path: "/requests", icon: "document" },
-  { name: "Profile", path: "/profile", icon: "user" },
-];
+const navigationItems = computed(() => [
+  { name: t("nav.dashboard"), path: "/", icon: "home" },
+  { name: t("nav.workLogs"), path: "/work-logs", icon: "clock" },
+  { name: t("nav.absences"), path: "/absences", icon: "calendar" },
+  { name: t("nav.requests"), path: "/requests", icon: "document" },
+  { name: t("nav.profile"), path: "/profile", icon: "user" },
+]);
 
 const isActive = (path: string) => {
   return route.path === path;
@@ -101,7 +104,7 @@ const icons = {
           </div>
           <div class="ml-3">
             <p class="text-sm font-medium text-neutral-800">{{ username }}</p>
-            <p class="text-xs text-neutral-500">Employee</p>
+            <p class="text-xs text-neutral-500">{{ t('nav.employee') }}</p>
           </div>
         </div>
       </div>
@@ -136,7 +139,7 @@ const icons = {
         class="p-4 text-center text-xs text-neutral-500 border-t border-neutral-200"
       >
         <p>Tiemply v1.0.0</p>
-        <p>© 2025 All rights reserved</p>
+        <p>© 2025 {{ t('common.allRightsReserved') }}</p>
       </div>
     </div>
   </aside>

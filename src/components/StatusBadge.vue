@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import type { WorkState } from '../types';
+
+const { t } = useI18n();
 
 const props = defineProps<{
   state: WorkState;
@@ -20,7 +23,7 @@ const stateConfig = computed(() => {
   switch (props.state) {
     case 'working':
       return {
-        label: 'Working',
+        label: t('workStatus.working'),
         bgClass: 'bg-green-100 dark:bg-green-900/30',
         textClass: 'text-green-700 dark:text-green-400',
         borderClass: 'border-green-300 dark:border-green-700',
@@ -29,7 +32,7 @@ const stateConfig = computed(() => {
       };
     case 'on_break':
       return {
-        label: 'On Break',
+        label: t('workStatus.onBreak'),
         bgClass: 'bg-amber-100 dark:bg-amber-900/30',
         textClass: 'text-amber-700 dark:text-amber-400',
         borderClass: 'border-amber-300 dark:border-amber-700',
@@ -38,7 +41,7 @@ const stateConfig = computed(() => {
       };
     case 'offsite':
       return {
-        label: 'Offsite',
+        label: t('workStatus.offsite'),
         bgClass: 'bg-blue-100 dark:bg-blue-900/30',
         textClass: 'text-blue-700 dark:text-blue-400',
         borderClass: 'border-blue-300 dark:border-blue-700',
@@ -47,7 +50,7 @@ const stateConfig = computed(() => {
       };
     default:
       return {
-        label: 'Not Working',
+        label: t('workStatus.notWorking'),
         bgClass: 'bg-gray-100 dark:bg-gray-800',
         textClass: 'text-gray-600 dark:text-gray-400',
         borderClass: 'border-gray-300 dark:border-gray-600',

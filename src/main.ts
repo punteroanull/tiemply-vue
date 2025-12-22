@@ -5,6 +5,7 @@ import 'vue-toastification/dist/index.css'
 
 import App from './App.vue'
 import router from './router'
+import i18n from './i18n'
 import './assets/main.css'
 import { setupOfflineListeners } from './utils/offlineManager'
 import { vClickOutside } from './directives/clickOutside'
@@ -13,6 +14,7 @@ const app = createApp(App)
 
 app.use(createPinia())
 app.use(router)
+app.use(i18n)
 app.use(Toast, {
   transition: "Vue-Toastification__bounce",
   maxToasts: 3,

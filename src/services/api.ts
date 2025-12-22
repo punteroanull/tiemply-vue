@@ -10,13 +10,18 @@ const api = axios.create({
   },
 });
 
-// Add a request interceptor to add the auth token
+// Add a request interceptor to add the auth token and locale
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Add Accept-Language header for i18n
+    const locale = localStorage.getItem("locale") || "en";
+    config.headers["Accept-Language"] = locale;
+
     return config;
   },
   (error) => {

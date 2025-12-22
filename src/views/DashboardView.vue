@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from "vue";
 import { useRouter } from "vue-router";
+import { useI18n } from "vue-i18n";
 import { useWorkStatusStore } from "../stores/workStatus";
 import { useWorkLogsStore } from "../stores/workLogs";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
 import { format, parseISO } from "date-fns";
+import { enUS, es } from "date-fns/locale";
 import StatusBadge from '../components/StatusBadge.vue';
+
+const { t, locale } = useI18n();
 
 // Safe date formatting helper
 function formatDate(dateValue: string | undefined | null, formatStr: string): string {
@@ -29,7 +33,8 @@ const loading = ref(true);
 
 // Computed properties for user info
 const userName = computed(() => authStore.user?.name || "User");
-const todayDate = computed(() => format(new Date(), "EEEE, MMMM d, yyyy"));
+const dateLocale = computed(() => locale.value === "es" ? es : enUS);
+const todayDate = computed(() => format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale.value }));
 
 // Today's date formatted for API
 //const today = format(new Date(), "yyyy-MM-dd");
@@ -69,7 +74,7 @@ function navigateToNewRequest() {
     <div class="mb-6 md:flex md:items-center md:justify-between">
       <div>
         <h1 class="text-2xl font-semibold text-neutral-800">
-          Welcome, {{ userName }}
+          {{ $t('dashboard.welcome', { name: userName }) }}
         </h1>
         <p class="text-neutral-500 mt-1">{{ todayDate }}</p>
       </div>
@@ -85,7 +90,7 @@ function navigateToNewRequest() {
       <!-- Current Status Card -->
       <div class="card">
         <div class="flex justify-between items-start mb-4">
-          <h2 class="text-lg font-medium text-neutral-800">Current Status</h2>
+          <h2 class="text-lg font-medium text-neutral-800">{{ $t('dashboard.currentStatus') }}</h2>
           <StatusBadge :state="workStatusStore.currentState" />
         </div>
 
@@ -96,10 +101,10 @@ function navigateToNewRequest() {
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
-              <p class="text-sm text-neutral-600">Working since</p>
+              <p class="text-sm text-neutral-600">{{ $t('dashboard.workingSince') }}</p>
               <p class="font-semibold">{{ workStatusStore.formattedLastCheckIn }}</p>
               <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-green-600 mt-1">
-                Duration: {{ workStatusStore.formattedCurrentDuration }}
+                {{ $t('dashboard.duration') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
           </div>
@@ -108,10 +113,10 @@ function navigateToNewRequest() {
           <div v-else-if="workStatusStore.currentState === 'on_break'" class="flex items-center text-amber-700">
             <span class="text-2xl mr-2">☕</span>
             <div>
-              <p class="text-sm text-neutral-600">On break</p>
-              <p class="font-semibold">Started at {{ workStatusStore.formattedLastCheckOut }}</p>
+              <p class="text-sm text-neutral-600">{{ $t('dashboard.onBreak') }}</p>
+              <p class="font-semibold">{{ $t('dashboard.startedAt') }} {{ workStatusStore.formattedLastCheckOut }}</p>
               <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-amber-600 mt-1">
-                Break time: {{ workStatusStore.formattedCurrentDuration }}
+                {{ $t('dashboard.breakTime') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
           </div>
@@ -120,10 +125,10 @@ function navigateToNewRequest() {
           <div v-else-if="workStatusStore.currentState === 'offsite'" class="flex items-center text-blue-700">
             <span class="text-2xl mr-2">🚗</span>
             <div>
-              <p class="text-sm text-neutral-600">Offsite</p>
-              <p class="font-semibold">Left at {{ workStatusStore.formattedLastCheckOut }}</p>
+              <p class="text-sm text-neutral-600">{{ $t('dashboard.offsite') }}</p>
+              <p class="font-semibold">{{ $t('dashboard.leftAt') }} {{ workStatusStore.formattedLastCheckOut }}</p>
               <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-blue-600 mt-1">
-                Time offsite: {{ workStatusStore.formattedCurrentDuration }}
+                {{ $t('dashboard.timeOffsite') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
           </div>
@@ -134,14 +139,14 @@ function navigateToNewRequest() {
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
-              <p class="text-sm text-neutral-600">Last checked out</p>
+              <p class="text-sm text-neutral-600">{{ $t('dashboard.lastCheckedOut') }}</p>
               <p class="font-semibold">{{ workStatusStore.formattedLastCheckOut }}</p>
             </div>
           </div>
 
           <!-- Never Checked In -->
           <div v-else class="text-neutral-600">
-            <p>You haven't checked in today.</p>
+            <p>{{ $t('dashboard.notCheckedIn') }}</p>
           </div>
         </div>
       </div>
@@ -149,24 +154,24 @@ function navigateToNewRequest() {
       <!-- Weekly Summary Card -->
       <div class="card">
         <div class="flex justify-between items-start mb-4">
-          <h2 class="text-lg font-medium text-neutral-800">Weekly Summary</h2>
+          <h2 class="text-lg font-medium text-neutral-800">{{ $t('dashboard.weeklySummary') }}</h2>
           <button
             @click="navigateToWorkLogs"
             class="text-sm text-primary-600 hover:text-primary-700 hover:underline"
           >
-            View all
+            {{ $t('dashboard.viewAll') }}
           </button>
         </div>
 
         <div v-if="workLogsStore.weeklyReport">
           <div class="flex justify-between mb-2">
-            <span class="text-neutral-600">Total hours</span>
+            <span class="text-neutral-600">{{ $t('dashboard.totalHours') }}</span>
             <span class="font-semibold">{{
               workLogsStore.weeklyReport.totalDuration || "0:00"
             }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-neutral-600">Days worked</span>
+            <span class="text-neutral-600">{{ $t('dashboard.daysWorked') }}</span>
             <span class="font-semibold"
               >{{ workLogsStore.weeklyReport.totalDays || 0 }}/5</span
             >
@@ -190,19 +195,19 @@ function navigateToNewRequest() {
           </div>
         </div>
         <div v-else class="text-neutral-600">
-          <p>No work logs available for this week.</p>
+          <p>{{ $t('dashboard.noWorkLogs') }}</p>
         </div>
       </div>
 
       <!-- Pending Requests Card -->
       <div class="card">
         <div class="flex justify-between items-start mb-4">
-          <h2 class="text-lg font-medium text-neutral-800">Pending Requests</h2>
+          <h2 class="text-lg font-medium text-neutral-800">{{ $t('dashboard.pendingRequests') }}</h2>
           <button
             @click="navigateToRequests"
             class="text-sm text-primary-600 hover:text-primary-700 hover:underline"
           >
-            View all
+            {{ $t('dashboard.viewAll') }}
           </button>
         </div>
 
@@ -220,9 +225,9 @@ function navigateToNewRequest() {
             >
               <div class="flex justify-between">
                 <span class="font-medium">{{
-                  request.absenceType?.name || "Absence"
+                  request.absenceType?.name || t('absences.absence')
                 }}</span>
-                <span class="badge-warning">Pending</span>
+                <span class="badge-warning">{{ $t('dashboard.pending') }}</span>
               </div>
               <div class="text-sm text-neutral-600 mt-1">
                 {{ formatDate(request.startDate, "MMM d, yyyy") }} -
@@ -232,19 +237,19 @@ function navigateToNewRequest() {
           </ul>
         </div>
         <div v-else class="text-neutral-600">
-          <p>No pending requests.</p>
+          <p>{{ $t('dashboard.noPendingRequests') }}</p>
           <button
             @click="navigateToNewRequest"
             class="mt-3 text-sm bg-primary-50 text-primary-700 px-3 py-2 rounded-md hover:bg-primary-100 transition-colors"
           >
-            Create new request
+            {{ $t('dashboard.createNewRequest') }}
           </button>
         </div>
       </div>
 
       <!-- Quick Actions Card -->
       <div class="card">
-        <h2 class="text-lg font-medium text-neutral-800 mb-4">Quick Actions</h2>
+        <h2 class="text-lg font-medium text-neutral-800 mb-4">{{ $t('dashboard.quickActions') }}</h2>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
@@ -263,7 +268,7 @@ function navigateToNewRequest() {
                 clip-rule="evenodd"
               />
             </svg>
-            <span>New absence request</span>
+            <span>{{ $t('newRequest.newAbsenceRequest') }}</span>
           </button>
 
           <button
@@ -282,7 +287,7 @@ function navigateToNewRequest() {
                 clip-rule="evenodd"
               />
             </svg>
-            <span>View work logs</span>
+            <span>{{ $t('newRequest.viewWorkLogs') }}</span>
           </button>
 
           <!-- Quick Actions based on state -->
@@ -292,7 +297,7 @@ function navigateToNewRequest() {
               class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
               <span class="text-xl mr-2">▶️</span>
-              <span>Start your shift</span>
+              <span>{{ $t('workStatus.startYourShift') }}</span>
             </button>
           </template>
 
@@ -302,21 +307,21 @@ function navigateToNewRequest() {
               class="flex items-center p-3 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors text-amber-700"
             >
               <span class="text-xl mr-2">☕</span>
-              <span>Take a break</span>
+              <span>{{ $t('workStatus.takeBreak') }}</span>
             </button>
             <button
               @click="workStatusStore.startOffsite"
               class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors text-blue-700"
             >
               <span class="text-xl mr-2">🚗</span>
-              <span>Go offsite</span>
+              <span>{{ $t('workStatus.goOffsiteAction') }}</span>
             </button>
             <button
               @click="workStatusStore.endShift"
               class="flex items-center p-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-red-700 sm:col-span-2"
             >
               <span class="text-xl mr-2">⏹️</span>
-              <span>End your shift</span>
+              <span>{{ $t('workStatus.endYourShift') }}</span>
             </button>
           </template>
 
@@ -326,7 +331,7 @@ function navigateToNewRequest() {
               class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
               <span class="text-xl mr-2">↩️</span>
-              <span>Return from break</span>
+              <span>{{ $t('workStatus.returnFromBreak') }}</span>
             </button>
           </template>
 
@@ -336,7 +341,7 @@ function navigateToNewRequest() {
               class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
               <span class="text-xl mr-2">🏢</span>
-              <span>Return to office</span>
+              <span>{{ $t('workStatus.returnToOfficeAction') }}</span>
             </button>
           </template>
         </div>

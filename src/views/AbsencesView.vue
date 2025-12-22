@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useAbsencesStore } from '../stores/absences';
 import { format, parseISO, subMonths } from 'date-fns';
+import { enUS, es } from 'date-fns/locale';
 import AbsenceCalendar from '../components/AbsenceCalendar.vue';
+
+const { t, locale } = useI18n();
 
 const absencesStore = useAbsencesStore();
 const loading = computed(() => absencesStore.loading);
 const viewMode = ref('list'); // or 'calendar'
+
+// Date locale
+const dateLocale = computed(() => locale.value === "es" ? es : enUS);
 
 // Filter states
 const selectedType = ref('all');
@@ -31,13 +38,13 @@ const filteredAbsences = computed(() => {
 
 // Format absence duration
 function formatAbsenceDuration(absence: any) {
-  if (!absence.is_partial) return 'Full day';
-  
+  if (!absence.is_partial) return t('absences.fullDay');
+
   if (absence.start_time && absence.end_time) {
     return `${format(parseISO(absence.start_time), 'h:mm a')} - ${format(parseISO(absence.end_time), 'h:mm a')}`;
   }
-  
-  return 'Partial day';
+
+  return t('absences.partialDay');
 }
 
 // Get absence type badge class
@@ -68,8 +75,8 @@ onMounted(async () => {
 <template>
   <div class="container mx-auto px-4 py-8">
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-neutral-800">Absences</h1>
-      <p class="text-neutral-600 mt-1">View and filter your absences</p>
+      <h1 class="text-2xl font-bold text-neutral-800">{{ $t('absences.title') }}</h1>
+      <p class="text-neutral-600 mt-1">{{ $t('absences.viewAndFilter') }}</p>
     </div>
     
     <!-- View Mode Toggle -->
@@ -80,14 +87,14 @@ onMounted(async () => {
           class="px-3 py-1 rounded-md text-sm font-medium transition-colors"
           :class="viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          List
+          {{ $t('absences.list') }}
         </button>
         <button
           @click="viewMode = 'calendar'"
           class="px-3 py-1 rounded-md text-sm font-medium transition-colors"
           :class="viewMode === 'calendar' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
-          Calendar
+          {{ $t('absences.calendar') }}
         </button>
       </div>
     </div>
@@ -104,39 +111,39 @@ onMounted(async () => {
         <div class="border-b border-neutral-200 p-4 bg-neutral-50">
           <div class="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
             <div class="w-full md:w-1/3">
-              <label for="type-filter" class="label">Absence Type</label>
-              <select 
-                id="type-filter" 
-                v-model="selectedType" 
+              <label for="type-filter" class="label">{{ $t('absences.absenceType') }}</label>
+              <select
+                id="type-filter"
+                v-model="selectedType"
                 class="input"
               >
-                <option value="all">All Types</option>
-                <option 
-                  v-for="type in absencesStore.absenceTypes" 
-                  :key="type.id" 
+                <option value="all">{{ $t('absences.allTypes') }}</option>
+                <option
+                  v-for="type in absencesStore.absenceTypes"
+                  :key="type.id"
                   :value="type.id"
                 >
                   {{ type.name }}
                 </option>
               </select>
             </div>
-            
+
             <div class="w-full md:w-1/3">
-              <label for="start-date" class="label">From</label>
-              <input 
-                id="start-date" 
-                v-model="startDate" 
-                type="date" 
+              <label for="start-date" class="label">{{ $t('absences.from') }}</label>
+              <input
+                id="start-date"
+                v-model="startDate"
+                type="date"
                 class="input"
               />
             </div>
-            
+
             <div class="w-full md:w-1/3">
-              <label for="end-date" class="label">To</label>
-              <input 
-                id="end-date" 
-                v-model="endDate" 
-                type="date" 
+              <label for="end-date" class="label">{{ $t('absences.to') }}</label>
+              <input
+                id="end-date"
+                v-model="endDate"
+                type="date"
                 class="input"
               />
             </div>
@@ -155,9 +162,9 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h3 class="text-lg font-medium text-neutral-800">No absences found</h3>
+          <h3 class="text-lg font-medium text-neutral-800">{{ $t('absences.noAbsences') }}</h3>
           <p class="text-neutral-600 mt-1">
-            {{ absencesStore.absences.length === 0 ? 'You have no recorded absences.' : 'No absences match your filter criteria.' }}
+            {{ absencesStore.absences.length === 0 ? $t('absences.noRecordedAbsences') : $t('absences.noMatchFilter') }}
           </p>
         </div>
         
@@ -167,31 +174,31 @@ onMounted(async () => {
             <thead class="bg-neutral-50">
               <tr>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Date
+                  {{ $t('workLogs.date') }}
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Type
+                  {{ $t('requests.type') }}
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Duration
+                  {{ $t('absences.duration') }}
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Status
+                  {{ $t('absences.status') }}
                 </th>
                 <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  Notes
+                  {{ $t('workLogs.notes') }}
                 </th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-neutral-200">
               <tr v-for="absence in filteredAbsences" :key="absence.id">
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800">
-                  {{ format(parseISO(absence.date), 'MMM d, yyyy') }}
+                  {{ format(parseISO(absence.date), 'MMM d, yyyy', { locale: dateLocale }) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                         :class="getAbsenceTypeClass(absence.absenceType?.code)">
-                    {{ absence.absenceType?.name || 'Unknown' }}
+                    {{ absence.absenceType?.name || t('absences.absence') }}
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">

@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
+import { useI18n } from "vue-i18n";
+import LanguageSelector from "./LanguageSelector.vue";
+
+const { t, locale } = useI18n();
 
 defineProps({
   username: {
@@ -14,8 +18,10 @@ const isProfileMenuOpen = ref(false);
 const currentTime = ref(new Date());
 const intervalId = ref<number | null>(null);
 
+const dateLocale = computed(() => locale.value === "es" ? "es-ES" : "en-US");
+
 function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString(dateLocale.value, {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -24,7 +30,7 @@ function formatDate(date: Date): string {
 }
 
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
+  return date.toLocaleTimeString(dateLocale.value, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -133,14 +139,23 @@ onUnmounted(() => {
                 class="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
                 @click="isProfileMenuOpen = false"
               >
-                Your Profile
+                {{ t('nav.yourProfile') }}
               </router-link>
+
+              <!-- Separator -->
+              <div class="border-t border-neutral-200 my-1"></div>
+
+              <!-- Language Selector -->
+              <LanguageSelector />
+
+              <!-- Separator -->
+              <div class="border-t border-neutral-200 my-1"></div>
 
               <button
                 @click="logout"
                 class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
               >
-                Sign out
+                {{ t('nav.signOut') }}
               </button>
             </div>
           </div>

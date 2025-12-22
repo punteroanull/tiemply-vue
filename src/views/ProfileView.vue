@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useAuthStore } from "../stores/auth";
 import { useWorkStatusStore } from "../stores/workStatus";
 import GeolocationSettings from "../components/GeolocationSettings.vue";
+
+const { t } = useI18n();
 
 const authStore = useAuthStore();
 const workStatusStore = useWorkStatusStore();
@@ -18,49 +21,49 @@ onMounted(async () => {
 
 <template>
   <div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-6">Profile</h1>
+    <h1 class="text-2xl font-bold mb-6">{{ $t('profile.title') }}</h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- User Information -->
       <div class="card">
         <h2 class="text-lg font-medium text-neutral-800 mb-4">
-          Personal Information
+          {{ $t('profile.personalInfo') }}
         </h2>
 
         <div class="space-y-4">
           <div>
-            <label class="label">Full Name</label>
+            <label class="label">{{ $t('profile.fullName') }}</label>
             <div class="text-neutral-800 font-medium">
-              {{ user?.name || "Not provided" }}
+              {{ user?.name || t('profile.notProvided') }}
             </div>
           </div>
 
           <div>
-            <label class="label">Email</label>
+            <label class="label">{{ $t('profile.email') }}</label>
             <div class="text-neutral-800">
-              {{ user?.email || "Not provided" }}
+              {{ user?.email || t('profile.notProvided') }}
             </div>
           </div>
 
           <div v-if="user?.identification_number">
-            <label class="label">ID Number</label>
+            <label class="label">{{ $t('profile.idNumber') }}</label>
             <div class="text-neutral-800">{{ user.identification_number }}</div>
           </div>
 
           <div v-if="user?.phone">
-            <label class="label">Phone</label>
+            <label class="label">{{ $t('profile.phone') }}</label>
             <div class="text-neutral-800">{{ user.phone }}</div>
           </div>
 
           <div v-if="user?.birth_date">
-            <label class="label">Birth Date</label>
+            <label class="label">{{ $t('profile.birthDate') }}</label>
             <div class="text-neutral-800">
               {{ new Date(user.birth_date).toLocaleDateString() }}
             </div>
           </div>
 
           <div v-if="user?.role">
-            <label class="label">Role</label>
+            <label class="label">{{ $t('profile.role') }}</label>
             <div class="text-neutral-800">{{ user.role.name }}</div>
           </div>
         </div>
@@ -69,31 +72,31 @@ onMounted(async () => {
       <!-- Company Information -->
       <div v-if="employee" class="card">
         <h2 class="text-lg font-medium text-neutral-800 mb-4">
-          Employment Information
+          {{ $t('profile.employmentInfo') }}
         </h2>
 
         <div class="space-y-4">
           <div v-if="employee.contract_start_time">
-            <label class="label">Work Schedule Start</label>
+            <label class="label">{{ $t('profile.workScheduleStart') }}</label>
             <div class="text-neutral-800">
               {{ employee.contract_start_time }}
             </div>
           </div>
 
           <div v-if="employee.contract_end_time">
-            <label class="label">Work Schedule End</label>
+            <label class="label">{{ $t('profile.workScheduleEnd') }}</label>
             <div class="text-neutral-800">{{ employee.contract_end_time }}</div>
           </div>
 
           <div>
-            <label class="label">Remaining Vacation Days</label>
+            <label class="label">{{ $t('profile.remainingVacation') }}</label>
             <div class="text-neutral-800 font-medium">
-              {{ employee.remaining_vacation_days || 0 }} days
+              {{ employee.remaining_vacation_days || 0 }} {{ $t('profile.days') }}
             </div>
           </div>
 
           <div>
-            <label class="label">Status</label>
+            <label class="label">{{ $t('profile.status') }}</label>
             <span
               class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
               :class="
@@ -102,7 +105,7 @@ onMounted(async () => {
                   : 'bg-red-100 text-red-800'
               "
             >
-              {{ employee.active ? "Active" : "Inactive" }}
+              {{ employee.active ? $t('profile.active') : $t('profile.inactive') }}
             </span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { useWorkLogsStore } from "../stores/workLogs";
 import {
   parse,
@@ -11,28 +12,35 @@ import {
   startOfWeek,
   endOfWeek,
 } from "date-fns";
+import { enUS, es } from "date-fns/locale";
+
+const { locale } = useI18n();
 
 const workLogsStore = useWorkLogsStore();
 const activeTab = ref("daily");
 
 const isLoading = computed(() => workLogsStore.loading);
+const isExporting = computed(() => workLogsStore.exporting);
 
 // Date selection
 const selectedDate = ref(new Date());
 const selectedWeek = ref(new Date());
 const selectedMonth = ref(new Date());
 
+// Date locale
+const dateLocale = computed(() => locale.value === "es" ? es : enUS);
+
 // Format date for display
 const formattedSelectedDate = computed(() =>
-  format(selectedDate.value, "MMMM d, yyyy")
+  format(selectedDate.value, "MMMM d, yyyy", { locale: dateLocale.value })
 );
 const formattedSelectedWeek = computed(() => {
   const start = startOfWeek(selectedWeek.value, { weekStartsOn: 1 });
   const end = endOfWeek(selectedWeek.value, { weekStartsOn: 1 });
-  return `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`;
+  return `${format(start, "MMM d", { locale: dateLocale.value })} - ${format(end, "MMM d, yyyy", { locale: dateLocale.value })}`;
 });
 const formattedSelectedMonth = computed(() =>
-  format(selectedMonth.value, "MMMM yyyy")
+  format(selectedMonth.value, "MMMM yyyy", { locale: dateLocale.value })
 );
 
 // Format date for API
@@ -111,6 +119,18 @@ function changeTab(tab: string) {
   }
 }
 
+// Export PDF function
+async function exportPdf() {
+  if (activeTab.value === "daily") {
+    await workLogsStore.exportDailyPdf(dateForApi.value);
+  } else if (activeTab.value === "weekly") {
+    await workLogsStore.exportWeeklyPdf(weekStartForApi.value);
+  } else if (activeTab.value === "monthly") {
+    const [year, month] = monthForApi.value.split("-");
+    await workLogsStore.exportMonthlyPdf(parseInt(year), parseInt(month));
+  }
+}
+
 // Watch for changes in selected dates and reload data
 watch(
   () => dateForApi.value,
@@ -170,10 +190,56 @@ onMounted(async () => {
       class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6"
     >
       <h1 class="text-2xl font-bold text-neutral-800 mb-4 sm:mb-0">
-        Work Logs
+        {{ $t('workLogs.title') }}
       </h1>
 
-      <div class="flex space-x-2 bg-white rounded-lg shadow p-1">
+      <div class="flex items-center gap-4">
+        <!-- Export PDF Button -->
+        <button
+          @click="exportPdf"
+          :disabled="isExporting || !activeReport || !activeReport.days || activeReport.days.length === 0"
+          class="flex items-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed"
+        >
+          <svg
+            v-if="isExporting"
+            class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+            ></circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            class="h-4 w-4 mr-2"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          {{ isExporting ? $t('workLogs.exporting') : $t('workLogs.exportPdf') }}
+        </button>
+
+        <div class="flex space-x-2 bg-white rounded-lg shadow p-1">
         <button
           @click="changeTab('daily')"
           class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -183,7 +249,7 @@ onMounted(async () => {
               : 'text-neutral-600 hover:bg-neutral-100'
           "
         >
-          Daily
+          {{ $t('workLogs.daily') }}
         </button>
         <button
           @click="changeTab('weekly')"
@@ -194,7 +260,7 @@ onMounted(async () => {
               : 'text-neutral-600 hover:bg-neutral-100'
           "
         >
-          Weekly
+          {{ $t('workLogs.weekly') }}
         </button>
         <button
           @click="changeTab('monthly')"
@@ -205,8 +271,9 @@ onMounted(async () => {
               : 'text-neutral-600 hover:bg-neutral-100'
           "
         >
-          Monthly
+          {{ $t('workLogs.monthly') }}
         </button>
+        </div>
       </div>
     </div>
 
@@ -259,7 +326,7 @@ onMounted(async () => {
             "
             class="text-sm text-primary-600 hover:text-primary-700 mt-1"
           >
-            Today
+            {{ $t('workLogs.today') }}
           </button>
         </div>
 
@@ -320,9 +387,9 @@ onMounted(async () => {
             />
           </svg>
         </div>
-        <h3 class="text-lg font-medium text-neutral-800">No work logs found</h3>
+        <h3 class="text-lg font-medium text-neutral-800">{{ $t('workLogs.noWorkLogs') }}</h3>
         <p class="text-neutral-600 mt-1">
-          There are no work logs for this period.
+          {{ $t('workLogs.noWorkLogsForPeriod') }}
         </p>
       </div>
 
@@ -333,11 +400,11 @@ onMounted(async () => {
           class="flex justify-between items-center bg-neutral-50 p-4 border-b border-neutral-200"
         >
           <div>
-            <span class="text-sm text-neutral-600">Total days: </span>
+            <span class="text-sm text-neutral-600">{{ $t('workLogs.totalDays') }}: </span>
             <span class="font-medium">{{ activeReport.totalDays }}</span>
           </div>
           <div>
-            <span class="text-sm text-neutral-600">Total hours: </span>
+            <span class="text-sm text-neutral-600">{{ $t('workLogs.totalHours') }}: </span>
             <span class="font-medium">{{
               activeReport.totalDuration || "0:00"
             }}</span>
@@ -359,7 +426,7 @@ onMounted(async () => {
             >
               <div class="mb-2 md:mb-0">
                 <h3 class="font-medium text-neutral-800">
-                  {{ format(parseISO(day.date), "EEEE, MMMM d, yyyy") }}
+                  {{ format(parseISO(day.date), "EEEE, MMMM d, yyyy", { locale: dateLocale }) }}
                 </h3>
               </div>
 
@@ -381,7 +448,7 @@ onMounted(async () => {
                     />
                   </svg>
                   <div>
-                    <span class="text-sm text-neutral-600">Check in:</span>
+                    <span class="text-sm text-neutral-600">{{ $t('workLogs.checkIn') }}:</span>
                     <span class="font-medium ml-1">{{
                       day.checkIn ? formatTime(day.checkIn.time) : "-"
                     }}</span>
@@ -402,7 +469,7 @@ onMounted(async () => {
                     />
                   </svg>
                   <div>
-                    <span class="text-sm text-neutral-600">Check out:</span>
+                    <span class="text-sm text-neutral-600">{{ $t('workLogs.checkOut') }}:</span>
                     <span class="font-medium ml-1">{{
                       day.checkOut ? formatTime(day.checkOut.time) : "-"
                     }}</span>
@@ -423,7 +490,7 @@ onMounted(async () => {
                     />
                   </svg>
                   <div>
-                    <span class="text-sm text-neutral-600">Duration:</span>
+                    <span class="text-sm text-neutral-600">{{ $t('workLogs.duration') }}:</span>
                     <span class="font-medium ml-1">{{
                       day.duration || "0:00"
                     }}</span>
@@ -431,7 +498,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div v-else class="text-neutral-500 italic">
-                No work logs for this day
+                {{ $t('workLogs.noLogsForDay') }}
               </div>
             </div>
 
@@ -444,25 +511,25 @@ onMounted(async () => {
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                     >
-                      Time
+                      {{ $t('workLogs.time') }}
                     </th>
                     <th
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                     >
-                      Type
+                      {{ $t('workLogs.type') }}
                     </th>
                     <th
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                     >
-                      Category
+                      {{ $t('workLogs.category') }}
                     </th>
                     <th
                       scope="col"
                       class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                     >
-                      Notes
+                      {{ $t('workLogs.notes') }}
                     </th>
                   </tr>
                 </thead>
@@ -507,25 +574,25 @@ onMounted(async () => {
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Day
+                  {{ $t('workLogs.day') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Check In
+                  {{ $t('workLogs.checkIn') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Check Out
+                  {{ $t('workLogs.checkOut') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Duration
+                  {{ $t('workLogs.duration') }}
                 </th>
               </tr>
             </thead>
@@ -538,7 +605,7 @@ onMounted(async () => {
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
                 >
-                  {{ format(parseISO(day.date), "EEE, MMM d") }}
+                  {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
@@ -575,25 +642,25 @@ onMounted(async () => {
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Date
+                  {{ $t('workLogs.date') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Check In
+                  {{ $t('workLogs.checkIn') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Check Out
+                  {{ $t('workLogs.checkOut') }}
                 </th>
                 <th
                   scope="col"
                   class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                 >
-                  Duration
+                  {{ $t('workLogs.duration') }}
                 </th>
               </tr>
             </thead>
@@ -606,7 +673,7 @@ onMounted(async () => {
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
                 >
-                  {{ format(parseISO(day.date), "EEE, MMM d, yyyy") }}
+                  {{ format(parseISO(day.date), "EEE, MMM d, yyyy", { locale: dateLocale }) }}
                 </td>
                 <td
                   class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"

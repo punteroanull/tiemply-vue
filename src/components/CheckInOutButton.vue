@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useOnline } from '@vueuse/core';
+import { useI18n } from 'vue-i18n';
 import { useToast } from 'vue-toastification';
 import { useWorkStatusStore } from '../stores/workStatus';
 import { savePendingAction } from '../utils/offlineManager';
 import StatusBadge from './StatusBadge.vue';
 import type { WorkLogCategory } from '../types';
 
+const { t } = useI18n();
 const toast = useToast();
 const workStatusStore = useWorkStatusStore();
 const isOnline = useOnline();
@@ -24,7 +26,7 @@ const availableActions = computed(() => {
   if (state === 'not_working') {
     return [{
       id: 'start_shift',
-      label: 'Start Shift',
+      label: t('workStatus.startShift'),
       icon: '▶️',
       category: 'shift_start' as const,
       type: 'check-in' as const,
@@ -36,7 +38,7 @@ const availableActions = computed(() => {
     return [
       {
         id: 'start_break',
-        label: 'Start Break',
+        label: t('workStatus.startBreak'),
         icon: '☕',
         category: 'break_start' as const,
         type: 'check-out' as const,
@@ -44,7 +46,7 @@ const availableActions = computed(() => {
       },
       {
         id: 'start_offsite',
-        label: 'Go Offsite',
+        label: t('workStatus.goOffsite'),
         icon: '🚗',
         category: 'offsite_start' as const,
         type: 'check-out' as const,
@@ -52,7 +54,7 @@ const availableActions = computed(() => {
       },
       {
         id: 'end_shift',
-        label: 'End Shift',
+        label: t('workStatus.endShift'),
         icon: '⏹️',
         category: 'shift_end' as const,
         type: 'check-out' as const,
@@ -64,7 +66,7 @@ const availableActions = computed(() => {
   if (state === 'on_break') {
     return [{
       id: 'end_break',
-      label: 'Return from Break',
+      label: t('workStatus.returnFromBreak'),
       icon: '↩️',
       category: 'break_end' as const,
       type: 'check-in' as const,
@@ -75,7 +77,7 @@ const availableActions = computed(() => {
   if (state === 'offsite') {
     return [{
       id: 'end_offsite',
-      label: 'Return to Office',
+      label: t('workStatus.returnToOffice'),
       icon: '🏢',
       category: 'offsite_end' as const,
       type: 'check-in' as const,
@@ -126,7 +128,7 @@ async function handleAction(action: {
           notes: `${action.label} offline via Tiemply app`
         }
       });
-      toast.info('Saved for syncing when connection is restored');
+      toast.info(t('messages.savedOffline'));
 
       // Update UI temporarily
       if (action.type === 'check-in') {
@@ -228,10 +230,10 @@ onUnmounted(() => {
         class="absolute -top-1 -right-1"
         :title="
           workStatusStore.locationError
-            ? `Location error: ${workStatusStore.locationError.message}`
+            ? `${t('messages.locationError')}: ${workStatusStore.locationError.message}`
             : workStatusStore.locationData
-            ? 'Location ready'
-            : 'Location will be requested'
+            ? t('messages.locationReady')
+            : t('messages.locationPending')
         "
       >
         <span
@@ -304,9 +306,9 @@ onUnmounted(() => {
               ]"
             />
             <span class="text-gray-500">
-              {{ workStatusStore.gettingLocation ? 'Getting location...' :
-                 workStatusStore.locationError ? 'Location error' :
-                 workStatusStore.locationData ? 'Location ready' : 'Location pending' }}
+              {{ workStatusStore.gettingLocation ? t('messages.gettingLocation') :
+                 workStatusStore.locationError ? t('messages.locationError') :
+                 workStatusStore.locationData ? t('messages.locationReady') : t('messages.locationPending') }}
             </span>
           </div>
           <div
@@ -324,7 +326,7 @@ onUnmounted(() => {
         >
           <div class="flex items-center gap-2 text-xs text-amber-700">
             <span class="w-2 h-2 rounded-full bg-amber-500" />
-            Offline - actions will sync later
+            {{ t('messages.offlineActionsWillSync') }}
           </div>
         </div>
       </div>

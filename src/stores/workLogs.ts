@@ -41,6 +41,7 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
 
   //const activeReport = ref<WorkLogReport | null>(null);
   const loading = ref(false);
+  const exporting = ref(false);
 
   async function fetchDailyReport(period?: string) {
     if (!authStore.user?.id) return;
@@ -239,13 +240,120 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     }
   }
 
+  // Helper function to download blob as file
+  function downloadBlob(blob: Blob, filename: string) {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }
+
+  async function exportDailyPdf(period: string): Promise<boolean> {
+    if (!authStore.user?.id) return false;
+
+    exporting.value = true;
+
+    try {
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      if (!employeeId) {
+        throw new Error("Employee record not found");
+      }
+
+      const url = `/worklogs/daily-report/${employeeId}/${period}/pdf`;
+      const response = await api.get(url, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      downloadBlob(blob, `daily_report_${period}.pdf`);
+
+      toast.success("PDF exported successfully");
+      return true;
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF");
+      return false;
+    } finally {
+      exporting.value = false;
+    }
+  }
+
+  async function exportWeeklyPdf(period: string): Promise<boolean> {
+    if (!authStore.user?.id) return false;
+
+    exporting.value = true;
+
+    try {
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      if (!employeeId) {
+        throw new Error("Employee record not found");
+      }
+
+      const url = `/worklogs/weekly-report/${employeeId}/${period}/pdf`;
+      const response = await api.get(url, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      downloadBlob(blob, `weekly_report_${period}.pdf`);
+
+      toast.success("PDF exported successfully");
+      return true;
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF");
+      return false;
+    } finally {
+      exporting.value = false;
+    }
+  }
+
+  async function exportMonthlyPdf(year: number, month: number): Promise<boolean> {
+    if (!authStore.user?.id) return false;
+
+    exporting.value = true;
+
+    try {
+      const employeeId = authStore.user.employeeRecords?.[0]?.id;
+      if (!employeeId) {
+        throw new Error("Employee record not found");
+      }
+
+      const url = `/worklogs/monthly-report/${employeeId}/${year}/${month}/pdf`;
+      const response = await api.get(url, {
+        responseType: "blob",
+      });
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const monthStr = String(month).padStart(2, "0");
+      downloadBlob(blob, `monthly_report_${year}-${monthStr}.pdf`);
+
+      toast.success("PDF exported successfully");
+      return true;
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      toast.error("Failed to export PDF");
+      return false;
+    } finally {
+      exporting.value = false;
+    }
+  }
+
   return {
     dailyReport,
     weeklyReport,
     monthlyReport,
     loading,
+    exporting,
     fetchDailyReport,
     fetchWeeklyReport,
     fetchMonthlyReport,
+    exportDailyPdf,
+    exportWeeklyPdf,
+    exportMonthlyPdf,
   };
 });

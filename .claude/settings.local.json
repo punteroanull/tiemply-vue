@@ -17,7 +17,8 @@
       "Bash(npm.cmd run build:*)",
       "Bash(docker restart:*)",
       "Bash(docker logs:*)",
-      "Bash(cmd //c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")"
+      "Bash(cmd //c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")",
+      "Bash(dir:*)"
     ]
   }
 }
