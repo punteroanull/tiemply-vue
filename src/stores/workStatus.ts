@@ -267,6 +267,18 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
           default:
             workState = 'working';
         }
+      } else if (apiData.status === 'out') {
+        // Cuando está en checkout, verificar si es break u offsite activo
+        switch (category) {
+          case 'break_start':
+            workState = 'on_break';
+            break;
+          case 'offsite_start':
+            workState = 'offsite';
+            break;
+          default:
+            workState = 'not_working';
+        }
       }
 
       lastCategory.value = category || null;
