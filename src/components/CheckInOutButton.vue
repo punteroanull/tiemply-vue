@@ -6,6 +6,7 @@ import { useToast } from 'vue-toastification';
 import { useWorkStatusStore } from '../stores/workStatus';
 import { savePendingAction } from '../utils/offlineManager';
 import StatusBadge from './StatusBadge.vue';
+import NightShiftIndicator from './NightShiftIndicator.vue';
 import type { WorkLogCategory } from '../types';
 
 const { t } = useI18n();
@@ -263,13 +264,20 @@ onUnmounted(() => {
         <!-- Status Header -->
         <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
           <div class="flex items-center justify-between">
-            <StatusBadge :state="workStatusStore.currentState" size="sm" />
+            <div class="flex items-center gap-2">
+              <StatusBadge :state="workStatusStore.currentState" size="sm" />
+              <NightShiftIndicator v-if="workStatusStore.isNightShift" size="sm" />
+            </div>
             <span
               v-if="workStatusStore.formattedCurrentDuration"
               class="text-xs text-gray-500"
             >
               {{ workStatusStore.formattedCurrentDuration }}
             </span>
+          </div>
+          <!-- Night Shift Date Info -->
+          <div v-if="workStatusStore.isNightShift && workStatusStore.shiftDate" class="mt-2 text-xs text-purple-600">
+            {{ t('workLog.shiftDateDifferent', { date: workStatusStore.shiftDate }) }}
           </div>
         </div>
 

@@ -11,7 +11,11 @@ export type WorkLogCategory =
 
 export type WorkState = 'not_working' | 'working' | 'on_break' | 'offsite';
 
-export type AbsenceRequestStatus = 'pending' | 'approved' | 'rejected';
+export type WorkLogSource = 'web' | 'mobile' | 'nfc' | 'manual';
+
+export type AbsenceRequestStatus = 'pending' | 'approved' | 'rejected' | 'partial';
+
+export type AbsenceRequestPeriodStatus = 'pending' | 'approved' | 'rejected';
 
 export type VacationType = 'business_days' | 'calendar_days';
 
@@ -58,6 +62,8 @@ export interface Company {
   phone: string;
   vacation_type: VacationType;
   max_vacation_days: number;
+  allow_vacation_excess?: boolean;
+  max_vacation_excess_days?: number | null;
   geolocation_enabled: boolean;
   geolocation_required: boolean;
   geolocation_radius?: number;
@@ -69,16 +75,29 @@ export interface Company {
   updated_at?: string;
 }
 
+export interface Department {
+  id: string;
+  uuid: string;
+  company_id: string;
+  supervisor_id?: string;
+  name: string;
+  description?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Employee {
   id: string;
   uuid: string;
   company_id: string;
+  department_id?: string;
   user_id: string;
   contract_start_time?: string;
   contract_end_time?: string;
   remaining_vacation_days: number;
   active: boolean;
   company?: Company;
+  department?: Department;
   user?: User;
   created_at?: string;
   updated_at?: string;
@@ -96,6 +115,9 @@ export interface WorkLog {
   ip_address?: string;
   location?: string | LocationData;
   notes?: string;
+  nfc_device_id?: string | null;
+  nfc_card_id?: string | null;
+  source?: WorkLogSource;
   created_at?: string;
   updated_at?: string;
 }
@@ -139,13 +161,28 @@ export interface Absence {
   updated_at?: string;
 }
 
+export interface AbsenceRequestPeriod {
+  id: string;
+  start_date: string;
+  end_date: string;
+  is_partial: boolean;
+  start_time?: string;
+  end_time?: string;
+  status: AbsenceRequestPeriodStatus;
+  days_count: number;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  reviewer?: User;
+}
+
 export interface AbsenceRequest {
   id: string;
   uuid: string;
   employee_id: string;
   absence_type_id: string;
-  start_date: string;
-  end_date: string;
+  start_date: string | null;
+  end_date: string | null;
   is_partial: boolean;
   start_time?: string;
   end_time?: string;
@@ -155,6 +192,10 @@ export interface AbsenceRequest {
   rejection_reason?: string;
   reviewed_at?: string;
   days_count: number;
+  uses_periods?: boolean;
+  approved_days_count?: number;
+  pending_days_count?: number;
+  periods?: AbsenceRequestPeriod[];
   absenceType?: AbsenceType;
   reviewer?: User;
   employee?: Employee;
@@ -203,4 +244,127 @@ export interface WorkLogReport {
   days: WorkLogPair[];
   total_duration: string;
   total_days: number;
+}
+
+// ==========================================
+// SCHEDULE TYPES (Horarios Flexibles)
+// ==========================================
+
+export type ScheduleType = 'normal' | 'split' | 'night' | 'guard' | 'rotating';
+
+export interface ScheduleBlock {
+  id: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  crossesMidnight: boolean;
+  order: number;
+}
+
+export interface EmployeeSchedule {
+  id: string;
+  name: string;
+  scheduleType: ScheduleType;
+  isActive: boolean;
+  effectiveFrom: string;
+  effectiveUntil?: string;
+  blocks: ScheduleBlock[];
+}
+
+export interface WeeklyScheduleDay {
+  dayName: string;
+  blocks: ScheduleBlock[];
+  totalHours: number;
+}
+
+export interface WeeklyScheduleResponse {
+  weekStart: string;
+  weekEnd: string;
+  schedule: {
+    id: string;
+    name: string;
+    scheduleType: ScheduleType;
+  };
+  days: Record<string, WeeklyScheduleDay>;
+  totalWeeklyHours: number;
+}
+
+// ==========================================
+// OVERTIME TYPES (Horas Extra)
+// ==========================================
+
+export type OvertimeStatus = 'pending' | 'approved' | 'rejected';
+
+export interface OvertimeRecord {
+  id: string;
+  date: string;
+  hours: number;
+  status: OvertimeStatus;
+  approvedBy?: string;
+  approvedAt?: string;
+  notes?: string;
+}
+
+export interface OvertimeMonthSummary {
+  approved: number;
+  pending: number;
+  rejected: number;
+}
+
+export interface OvertimeSummary {
+  employeeId: string;
+  year: number;
+  totalHours: number;
+  approvedHours: number;
+  pendingHours: number;
+  rejectedHours: number;
+  annualLimit: number;
+  remainingLimit: number;
+  byMonth: Record<string, OvertimeMonthSummary>;
+  records: OvertimeRecord[];
+}
+
+export interface OvertimeRegistered {
+  hours: number;
+  status: OvertimeStatus;
+  message: string;
+}
+
+// ==========================================
+// INCIDENT TYPES (Incidencias)
+// ==========================================
+
+export type IncidentType = 'unclosed_shift' | 'late_arrival' | 'early_departure' | 'missing_checkout';
+export type IncidentStatus = 'pending' | 'resolved' | 'validated' | 'marked_absence';
+
+export interface Incident {
+  id: string;
+  date: string;
+  type: IncidentType;
+  status: IncidentStatus;
+  expectedTime?: string;
+  actualTime?: string;
+  resolvedTime?: string;
+  resolutionType?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+  notes?: string;
+}
+
+export interface IncidentFilters {
+  status?: IncidentStatus;
+  type?: IncidentType;
+  startDate?: string;
+  endDate?: string;
+}
+
+// ==========================================
+// ENHANCED COMPANY SETTINGS
+// ==========================================
+
+export interface EnhancedCompanySettings extends CompanySettings {
+  weeklyHoursLimit?: number;
+  annualOvertimeLimit?: number;
+  overtimeApprovalMode?: 'pre_approval' | 'auto_register';
+  maxVacationDays?: number;
 }

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useWorkLogsStore } from "../stores/workLogs";
+import SourceBadge from "../components/SourceBadge.vue";
 import {
   parse,
   format,
@@ -531,6 +532,12 @@ onMounted(async () => {
                     >
                       {{ $t('workLogs.notes') }}
                     </th>
+                    <th
+                      scope="col"
+                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                    >
+                      {{ $t('workLogs.source') }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-neutral-200">
@@ -554,6 +561,11 @@ onMounted(async () => {
                       class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                     >
                       {{ log.notes || "-" }}
+                    </td>
+                    <td
+                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                    >
+                      <SourceBadge :source="log.source" size="sm" />
                     </td>
                   </tr>
                 </tbody>

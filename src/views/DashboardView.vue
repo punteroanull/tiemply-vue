@@ -5,10 +5,15 @@ import { useI18n } from "vue-i18n";
 import { useWorkStatusStore } from "../stores/workStatus";
 import { useWorkLogsStore } from "../stores/workLogs";
 import { useAbsencesStore } from "../stores/absences";
+import { useSchedulesStore } from "../stores/schedules";
+import { useIncidentsStore } from "../stores/incidents";
 import { useAuthStore } from "../stores/auth";
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import StatusBadge from '../components/StatusBadge.vue';
+import AbsenceCalendar from '../components/AbsenceCalendar.vue';
+import ScheduleBlock from '../components/ScheduleBlock.vue';
+import NightShiftIndicator from '../components/NightShiftIndicator.vue';
 
 const { t, locale } = useI18n();
 
@@ -27,6 +32,8 @@ const router = useRouter();
 const workStatusStore = useWorkStatusStore();
 const workLogsStore = useWorkLogsStore();
 const absencesStore = useAbsencesStore();
+const schedulesStore = useSchedulesStore();
+const incidentsStore = useIncidentsStore();
 const authStore = useAuthStore();
 
 const loading = ref(true);
@@ -48,6 +55,10 @@ onMounted(async () => {
       workLogsStore.fetchDailyReport(),
       workLogsStore.fetchWeeklyReport(),
       absencesStore.fetchPendingRequests(),
+      absencesStore.fetchAbsences(),
+      schedulesStore.fetchCurrentSchedule(),
+      schedulesStore.fetchWeeklySchedule(),
+      incidentsStore.fetchIncidents({ status: 'pending' }),
     ]);
   } catch (error) {
     console.error("Error loading dashboard data:", error);
@@ -55,6 +66,10 @@ onMounted(async () => {
     loading.value = false;
   }
 });
+
+function navigateToAbsences() {
+  router.push("/absences");
+}
 
 function navigateToRequests() {
   router.push("/requests");
@@ -66,6 +81,14 @@ function navigateToWorkLogs() {
 
 function navigateToNewRequest() {
   router.push("/requests/new");
+}
+
+function navigateToSchedule() {
+  router.push("/schedule");
+}
+
+function navigateToIncidents() {
+  router.push("/incidents");
 }
 </script>
 
@@ -90,8 +113,16 @@ function navigateToNewRequest() {
       <!-- Current Status Card -->
       <div class="card">
         <div class="flex justify-between items-start mb-4">
-          <h2 class="text-lg font-medium text-neutral-800">{{ $t('dashboard.currentStatus') }}</h2>
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-medium text-neutral-800">{{ $t('dashboard.currentStatus') }}</h2>
+            <NightShiftIndicator v-if="workStatusStore.isNightShift" size="sm" />
+          </div>
           <StatusBadge :state="workStatusStore.currentState" />
+        </div>
+
+        <!-- Night Shift Info -->
+        <div v-if="workStatusStore.isNightShift && workStatusStore.shiftDate" class="mb-4 p-2 bg-purple-50 rounded-md text-sm text-purple-700">
+          {{ $t('workLog.shiftDateDifferent', { date: workStatusStore.shiftDate }) }}
         </div>
 
         <div class="space-y-4">
@@ -199,6 +230,56 @@ function navigateToNewRequest() {
         </div>
       </div>
 
+      <!-- Today's Schedule Card -->
+      <div v-if="schedulesStore.todaySchedule" class="card">
+        <div class="flex justify-between items-start mb-4">
+          <h2 class="text-lg font-medium text-neutral-800">{{ $t('schedule.todaySchedule') }}</h2>
+          <button
+            @click="navigateToSchedule"
+            class="text-sm text-primary-600 hover:text-primary-700 hover:underline"
+          >
+            {{ $t('dashboard.viewAll') }}
+          </button>
+        </div>
+
+        <div v-if="schedulesStore.todaySchedule.blocks?.length" class="space-y-2">
+          <ScheduleBlock
+            v-for="block in schedulesStore.todaySchedule.blocks"
+            :key="block.id"
+            :block="block"
+          />
+          <div class="mt-3 pt-3 border-t border-neutral-200 text-sm text-neutral-600">
+            {{ $t('schedule.totalDailyHours') }}: <span class="font-medium">{{ schedulesStore.todaySchedule.totalHours }}h</span>
+          </div>
+        </div>
+        <div v-else class="text-neutral-600">
+          <p>{{ $t('schedule.noBlocksToday') }}</p>
+        </div>
+      </div>
+
+      <!-- Incidents Alert -->
+      <div v-if="incidentsStore.hasPendingIncidents" class="card border-amber-200 bg-amber-50 md:col-span-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+            </div>
+            <div>
+              <p class="font-medium text-amber-800">{{ $t('incidents.pendingCount', { count: incidentsStore.pendingCount }) }}</p>
+              <p class="text-sm text-amber-600">{{ $t('incidents.title') }}</p>
+            </div>
+          </div>
+          <button
+            @click="navigateToIncidents"
+            class="px-4 py-2 bg-amber-200 text-amber-800 rounded-md hover:bg-amber-300 transition-colors text-sm font-medium"
+          >
+            {{ $t('dashboard.viewAll') }}
+          </button>
+        </div>
+      </div>
+
       <!-- Pending Requests Card -->
       <div class="card">
         <div class="flex justify-between items-start mb-4">
@@ -245,6 +326,24 @@ function navigateToNewRequest() {
             {{ $t('dashboard.createNewRequest') }}
           </button>
         </div>
+      </div>
+
+      <!-- Absence Calendar Card -->
+      <div class="card">
+        <div class="flex justify-between items-start mb-4">
+          <h2 class="text-lg font-medium text-neutral-800">{{ $t('absences.thisMonth') }}</h2>
+          <button
+            @click="navigateToAbsences"
+            class="text-sm text-primary-600 hover:text-primary-700 hover:underline"
+          >
+            {{ $t('dashboard.viewAll') }}
+          </button>
+        </div>
+        <AbsenceCalendar
+          :absences="absencesStore.absences"
+          :requests="absencesStore.pendingRequests"
+          :compact="true"
+        />
       </div>
 
       <!-- Quick Actions Card -->

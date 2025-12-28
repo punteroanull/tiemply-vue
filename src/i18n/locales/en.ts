@@ -3,6 +3,9 @@ export default {
   nav: {
     dashboard: 'Dashboard',
     workLogs: 'Work Logs',
+    schedule: 'My Schedule',
+    overtime: 'Overtime',
+    incidents: 'Incidents',
     absences: 'Absences',
     requests: 'Requests',
     profile: 'Profile',
@@ -110,7 +113,14 @@ export default {
     exporting: 'Exporting...',
     exportSuccess: 'PDF exported successfully',
     exportError: 'Failed to export PDF',
-    duration: 'Duration'
+    duration: 'Duration',
+    source: 'Source',
+    sourceTypes: {
+      web: 'Web',
+      mobile: 'Mobile',
+      nfc: 'NFC',
+      manual: 'Manual'
+    }
   },
 
   // Absences
@@ -130,7 +140,14 @@ export default {
     status: 'Status',
     fullDay: 'Full day',
     partialDay: 'Partial day',
-    absence: 'Absence'
+    absence: 'Absence',
+    vacationAvailable: 'Vacation available',
+    daysAvailable: '{remaining}/{total} days available',
+    daysUsed: '{count} day(s)',
+    pendingRequest: 'Pending request',
+    approvedAbsence: 'Approved absence',
+    clickToEdit: 'Click to edit',
+    thisMonth: 'This month'
   },
 
   // Requests
@@ -141,6 +158,7 @@ export default {
     pending: 'Pending',
     approved: 'Approved',
     rejected: 'Rejected',
+    partialStatus: 'Partial',
     noRequests: 'No requests found',
     noRequestsYet: "You haven't submitted any absence requests yet.",
     noFilterResults: 'No {status} requests found.',
@@ -160,7 +178,49 @@ export default {
     cancelError: 'Failed to cancel request',
     partial: 'Partial',
     reason: 'Reason',
-    actions: 'Actions'
+    actions: 'Actions',
+    editRequest: 'Edit Request',
+    saveChanges: 'Save Changes',
+    saving: 'Saving...',
+    requestUpdated: 'Request updated successfully',
+    updateError: 'Failed to update request',
+    cannotEditApproved: 'Cannot edit approved requests',
+    requestNotFound: 'Request not found',
+    edit: 'Edit',
+    addPeriod: 'Add period',
+    removePeriod: 'Remove period',
+    period: 'Period',
+    periods: 'Periods',
+    periodOf: 'Period {current} of {total}',
+    approvedDays: 'Approved days',
+    pendingDays: 'Pending days',
+    exceedsAvailable: 'Exceeds available days',
+    exceedsAllowed: 'Exceeds maximum allowed',
+    willUseExcess: 'Will use {days} excess days'
+  },
+
+  // Team Requests (Managers)
+  teamRequests: {
+    title: 'Team Requests',
+    pendingReview: 'Pending Review',
+    reviewed: 'Reviewed',
+    employee: 'Employee',
+    approve: 'Approve',
+    reject: 'Reject',
+    approveAll: 'Approve All',
+    rejectAll: 'Reject All',
+    rejectionReason: 'Rejection reason',
+    rejectionReasonPlaceholder: 'Enter reason for rejection...',
+    approveSuccess: 'Period approved successfully',
+    rejectSuccess: 'Period rejected successfully',
+    approveAllSuccess: 'All periods approved',
+    rejectAllSuccess: 'All periods rejected',
+    noTeamRequests: 'No pending requests from your team',
+    reviewedAt: 'Reviewed at',
+    approvePeriod: 'Approve period',
+    rejectPeriod: 'Reject period',
+    confirmReject: 'Confirm Rejection',
+    periodStatus: 'Period status'
   },
 
   // New Request
@@ -256,5 +316,173 @@ export default {
     spanish: 'Spanish',
     changeLanguage: 'Change language',
     languageChanged: 'Language changed successfully'
+  },
+
+  // Department
+  department: {
+    section: 'Department',
+    title: 'My Department',
+    myDepartment: 'My Department',
+    info: 'Department Info',
+    name: 'Name',
+    description: 'Description',
+    supervisor: 'Supervisor',
+    noSupervisor: 'No supervisor assigned',
+    employeeCount: 'Team Size',
+    employees: 'employees',
+    colleagues: 'Colleagues',
+    noColleagues: 'No colleagues in this department',
+    youAreSupervisor: 'You are the supervisor of this department',
+    noDepartment: 'You are not assigned to any department',
+    noDepartmentDescription: 'Contact your administrator to be assigned to a department.',
+
+    // Supervisor actions
+    supervisorActions: 'Supervisor Actions',
+    viewAbsences: 'Department Absences',
+    viewRequests: 'Pending Requests',
+    viewWorkLogs: 'Work Logs',
+    registerAbsence: 'Register Absence',
+
+    // Absences view
+    absences: 'Absences',
+    absencesDescription: 'View and manage department absences',
+    employee: 'Employee',
+    allEmployees: 'All Employees',
+    noAbsences: 'No absences found',
+    noAbsencesDescription: 'There are no absences recorded for the selected filters',
+
+    // Requests view
+    requests: 'Requests',
+    requestsDescription: 'Review and manage absence requests',
+    pendingRequests: 'Pending Requests',
+    noRequests: 'No pending requests',
+    noRequestsDescription: 'There are no absence requests to review',
+    approve: 'Approve',
+    reject: 'Reject',
+    approving: 'Approving...',
+    rejecting: 'Rejecting...',
+    requestApproved: 'Request approved successfully',
+    requestRejected: 'Request rejected successfully',
+
+    // Work logs view
+    workLogs: 'Work Logs',
+    workLogsDescription: 'View department work logs',
+    noWorkLogs: 'No work logs found',
+    noWorkLogsDescription: 'There are no work logs for the selected filters',
+
+    // New absence form
+    registerAbsenceDescription: 'Register a direct absence for a team member',
+    selectEmployee: 'Select an employee',
+    absenceCreated: 'Absence registered successfully',
+    absenceCreateError: 'Failed to register absence',
+
+    // Calendar
+    calendar: 'Department Calendar',
+    calendarDescription: 'View team absences calendar'
+  },
+
+  // Schedules
+  schedule: {
+    title: 'My Schedule',
+    weeklyView: 'Weekly View',
+    thisWeek: 'This Week',
+    previousWeek: 'Previous Week',
+    nextWeek: 'Next Week',
+    noSchedule: 'You have no assigned schedule',
+    noScheduleDescription: 'Contact your administrator to be assigned a schedule.',
+    totalWeeklyHours: 'Total weekly hours',
+    totalDailyHours: 'Total daily hours',
+    scheduleTypes: {
+      normal: 'Normal',
+      split: 'Split Shift',
+      night: 'Night Shift',
+      guard: 'On-Call',
+      rotating: 'Rotating'
+    },
+    block: 'Block',
+    startTime: 'Start',
+    endTime: 'End',
+    todaySchedule: "Today's Schedule",
+    weekOf: 'Week of {date}',
+    crossesMidnight: 'Crosses midnight',
+    nextDay: '(next day)',
+    noBlocksToday: 'No schedule blocks today',
+    effectiveFrom: 'Effective from',
+    effectiveUntil: 'Effective until'
+  },
+
+  // Overtime
+  overtime: {
+    title: 'Overtime',
+    summary: 'Annual Summary',
+    records: 'Records',
+    totalHours: 'Total Hours',
+    approved: 'Approved',
+    pending: 'Pending',
+    rejected: 'Rejected',
+    annualLimit: 'Annual Limit',
+    remaining: 'Remaining',
+    percentageUsed: '{percentage}% used',
+    nearLimit: 'Approaching annual limit',
+    atLimit: 'Annual limit reached',
+    automaticRegistration: 'Automatic registration',
+    manualRegistration: 'Manual registration',
+    monthlyBreakdown: 'Monthly Breakdown',
+    noRecords: 'No overtime records',
+    noRecordsDescription: 'You have no overtime hours registered yet.',
+    registeredMessage: '{hours} overtime hours have been registered',
+    date: 'Date',
+    hours: 'Hours',
+    status: 'Status',
+    approvedBy: 'Approved by',
+    approvedAt: 'Approved at',
+    filterByStatus: 'Filter by status',
+    filterByMonth: 'Filter by month',
+    allStatuses: 'All statuses',
+    allMonths: 'All months',
+    year: 'Year'
+  },
+
+  // Incidents
+  incidents: {
+    title: 'Shift Incidents',
+    types: {
+      unclosed_shift: 'Unclosed Shift',
+      late_arrival: 'Late Arrival',
+      early_departure: 'Early Departure',
+      missing_checkout: 'Missing Checkout'
+    },
+    statuses: {
+      pending: 'Pending',
+      resolved: 'Resolved',
+      validated: 'Validated',
+      marked_absence: 'Marked as Absence'
+    },
+    noIncidents: 'No incidents',
+    noIncidentsDescription: 'You have no incidents recorded.',
+    pendingCount: 'You have {count} pending incident(s)',
+    expectedTime: 'Expected time',
+    actualTime: 'Actual time',
+    resolvedTime: 'Resolution time',
+    difference: 'Difference',
+    minutes: '{count} min',
+    resolvedBy: 'Resolved by',
+    resolvedAt: 'Resolved at',
+    resolutionNotes: 'Resolution notes',
+    filterByType: 'Filter by type',
+    filterByStatus: 'Filter by status',
+    allTypes: 'All types',
+    allStatuses: 'All statuses',
+    date: 'Date'
+  },
+
+  // Work Log (extended)
+  workLog: {
+    nightShift: 'Night shift',
+    shiftDate: 'Shift date',
+    effectiveHours: 'Effective hours',
+    overtimeRegistered: 'Overtime registered',
+    nightShiftIndicator: 'You are on night shift',
+    shiftDateDifferent: 'Shift date: {date}'
   }
 }

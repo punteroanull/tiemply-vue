@@ -15,6 +15,9 @@ interface WorkLog {
   pairedLogId?: string;
   notes?: string;
   formattedDuration?: string;
+  nfcDeviceId?: string | null;
+  nfcCardId?: string | null;
+  source?: 'web' | 'mobile' | 'nfc' | 'manual';
 }
 
 interface WorkLogPair {
@@ -96,6 +99,9 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
                 pairedLogId: log.pairedLogId,
                 notes: log.notes,
                 formattedDuration: log.formattedDuration,
+                nfcDeviceId: log.nfcDeviceId,
+                nfcCardId: log.nfcCardId,
+                source: log.source,
               })) || [],
           },
         ],

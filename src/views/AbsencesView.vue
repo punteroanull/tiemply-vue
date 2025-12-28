@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAbsencesStore } from '../stores/absences';
+import { useAuthStore } from '../stores/auth';
 import { format, parseISO, subMonths } from 'date-fns';
 import { enUS, es } from 'date-fns/locale';
 import AbsenceCalendar from '../components/AbsenceCalendar.vue';
@@ -9,8 +10,51 @@ import AbsenceCalendar from '../components/AbsenceCalendar.vue';
 const { t, locale } = useI18n();
 
 const absencesStore = useAbsencesStore();
+const authStore = useAuthStore();
 const loading = computed(() => absencesStore.loading);
 const viewMode = ref('list'); // or 'calendar'
+
+// Vacation days info
+const remainingVacationDays = computed(() => authStore.remainingVacationDays);
+const maxVacationDays = computed(() => authStore.currentCompany?.max_vacation_days ?? 22);
+
+// Absences by type (excluding vacation, only approved)
+const absenceCountsByType = computed(() => {
+  const counts: Record<string, { name: string; count: number; code: string }> = {};
+
+  absencesStore.absences
+    .filter(absence =>
+      absence.absenceType?.code !== 'vacation' &&
+      (!absence.request || absence.request.status === 'approved')
+    )
+    .forEach(absence => {
+      const typeId = absence.absenceType?.id;
+      if (typeId && absence.absenceType) {
+        if (!counts[typeId]) {
+          counts[typeId] = {
+            name: absence.absenceType.name,
+            count: 0,
+            code: absence.absenceType.code
+          };
+        }
+        counts[typeId].count++;
+      }
+    });
+
+  return Object.values(counts);
+});
+
+// Get color classes for absence type
+function getTypeColorClasses(code: string) {
+  switch (code) {
+    case 'sick_leave':
+      return { bg: 'bg-red-50', text: 'text-red-600', icon: 'bg-red-100' };
+    case 'personal_leave':
+      return { bg: 'bg-purple-50', text: 'text-purple-600', icon: 'bg-purple-100' };
+    default:
+      return { bg: 'bg-neutral-50', text: 'text-neutral-600', icon: 'bg-neutral-100' };
+  }
+}
 
 // Date locale
 const dateLocale = computed(() => locale.value === "es" ? es : enUS);
@@ -65,10 +109,13 @@ onMounted(async () => {
   if (absencesStore.absenceTypes.length === 0) {
     await absencesStore.fetchAbsenceTypes();
   }
-  
+
   if (absencesStore.absences.length === 0) {
     await absencesStore.fetchAbsences();
   }
+
+  // Also fetch pending requests for the calendar
+  await absencesStore.fetchPendingRequests();
 });
 </script>
 
@@ -78,7 +125,56 @@ onMounted(async () => {
       <h1 class="text-2xl font-bold text-neutral-800">{{ $t('absences.title') }}</h1>
       <p class="text-neutral-600 mt-1">{{ $t('absences.viewAndFilter') }}</p>
     </div>
-    
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <!-- Vacation Days Card -->
+      <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-neutral-500">{{ $t('absences.vacationAvailable') }}</p>
+            <p class="text-xl font-bold text-blue-600">
+              {{ $t('absences.daysAvailable', { remaining: remainingVacationDays, total: maxVacationDays }) }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Other Absence Types Cards -->
+      <div
+        v-for="absenceType in absenceCountsByType"
+        :key="absenceType.code"
+        class="bg-white rounded-lg shadow p-4 border-l-4"
+        :class="{
+          'border-red-500': absenceType.code === 'sick_leave',
+          'border-purple-500': absenceType.code === 'personal_leave',
+          'border-neutral-400': absenceType.code !== 'sick_leave' && absenceType.code !== 'personal_leave'
+        }"
+      >
+        <div class="flex items-center">
+          <div
+            class="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center"
+            :class="getTypeColorClasses(absenceType.code).icon"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" :class="getTypeColorClasses(absenceType.code).text" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="ml-4">
+            <p class="text-sm font-medium text-neutral-500">{{ absenceType.name }}</p>
+            <p class="text-xl font-bold" :class="getTypeColorClasses(absenceType.code).text">
+              {{ $t('absences.daysUsed', { count: absenceType.count }) }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- View Mode Toggle -->
     <div class="flex justify-end mb-4">
       <div class="bg-white rounded-lg shadow p-1 inline-flex">
@@ -101,7 +197,7 @@ onMounted(async () => {
     
     <!-- Calendar View -->
     <div v-if="viewMode === 'calendar'" class="mb-6">
-      <AbsenceCalendar :absences="absencesStore.absences" />
+      <AbsenceCalendar :absences="absencesStore.absences" :requests="absencesStore.pendingRequests" />
     </div>
     
     <!-- List View -->

@@ -51,6 +51,7 @@ import {
 import type {
   WorkLogCategory,
   WorkState,
+  OvertimeRegistered,
 } from '../types';
 
 interface WorkStatus {
@@ -84,6 +85,12 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   const currentDuration = ref<string>("");
   const currentState = ref<WorkState>('not_working');
   const lastCategory = ref<WorkLogCategory | null>(null);
+
+  // Night shift and overtime states
+  const shiftDate = ref<string | null>(null);
+  const isNightShift = ref(false);
+  const effectiveHours = ref<number | null>(null);
+  const lastOvertimeRegistered = ref<OvertimeRegistered | null>(null);
 
   // Geolocation states
   const gettingLocation = ref(false);
@@ -411,7 +418,26 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         });
       }
 
-      await api.post("/worklogs/check-in", checkInData);
+      const response = await api.post("/worklogs/check-in", checkInData);
+
+      // Extract data from response
+      let responseData: any = null;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        responseData = response.data.data;
+      } else {
+        responseData = response.data;
+      }
+
+      // Handle night shift data
+      if (responseData?.shiftDate) {
+        shiftDate.value = responseData.shiftDate;
+      }
+      if (responseData?.isNightShift !== undefined) {
+        isNightShift.value = responseData.isNightShift;
+      }
+      if (responseData?.effectiveHours !== undefined) {
+        effectiveHours.value = responseData.effectiveHours;
+      }
 
       await fetchStatus();
 
@@ -485,7 +511,32 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         });
       }
 
-      await api.post("/worklogs/check-out", checkOutData);
+      const response = await api.post("/worklogs/check-out", checkOutData);
+
+      // Extract data from response
+      let responseData: any = null;
+      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+        responseData = response.data.data;
+      } else {
+        responseData = response.data;
+      }
+
+      // Handle night shift data
+      if (responseData?.shiftDate) {
+        shiftDate.value = responseData.shiftDate;
+      }
+      if (responseData?.isNightShift !== undefined) {
+        isNightShift.value = responseData.isNightShift;
+      }
+      if (responseData?.effectiveHours !== undefined) {
+        effectiveHours.value = responseData.effectiveHours;
+      }
+
+      // Handle overtime registered
+      if (responseData?.overtimeRegistered) {
+        lastOvertimeRegistered.value = responseData.overtimeRegistered;
+        toast.info(responseData.overtimeRegistered.message);
+      }
 
       await fetchStatus();
 
@@ -659,6 +710,12 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     // Nuevos estados
     currentState,
     lastCategory,
+
+    // Night shift and overtime states
+    shiftDate,
+    isNightShift,
+    effectiveHours,
+    lastOvertimeRegistered,
 
     // Estado de geolocalización
     gettingLocation,

@@ -24,12 +24,23 @@ interface Company {
   phone?: string;
   vacation_type: "business_days" | "calendar_days";
   max_vacation_days: number;
+  logoPath?: string;
+}
+
+interface Department {
+  id: string;
+  uuid: string;
+  companyId: string;
+  supervisorId?: string;
+  name: string;
+  description?: string;
 }
 
 interface Employee {
   id: string;
   uuid: string;
   company_id: string;
+  department_id?: string;
   user_id: string;
   contract_start_time?: string; // HH:mm format
   contract_end_time?: string; // HH:mm format
@@ -39,6 +50,7 @@ interface Employee {
   updated_at: string;
   // Relations
   company?: Company;
+  department?: Department;
 }
 
 interface User {
@@ -99,11 +111,36 @@ export const useAuthStore = defineStore("auth", () => {
     return currentEmployee.value?.company || null;
   });
 
+  const currentDepartment = computed(() => {
+    return currentEmployee.value?.department || null;
+  });
+
+  const currentDepartmentId = computed(() => {
+    return (currentEmployee.value as any)?.departmentId || null;
+  });
+
+  const companyLogoUrl = computed(() => {
+    const logoPath = currentCompany.value?.logoPath;
+    if (!logoPath) return null;
+
+    // Construir URL: {API_BASE}/storage/{logo_path}
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
+    const baseUrl = apiUrl.replace(/\/api$/, ""); // Quitar /api del final
+    return `${baseUrl}/storage/${logoPath}`;
+  });
+
   const userRole = computed(() => user.value?.role || null);
 
   const isAdmin = computed(() => userRole.value?.name === "Administrator");
   const isManager = computed(() => userRole.value?.name === "Manager");
   const isEmployee = computed(() => userRole.value?.name === "Employee");
+
+  const isSupervisor = computed(() => {
+    const deptId = currentDepartmentId.value;
+    const employeeId = currentEmployee.value?.id;
+    if (!deptId || !employeeId) return false;
+    return currentDepartment.value?.supervisorId === employeeId;
+  });
 
   const isExemptFromTimeTracking = computed(
     () => userRole.value?.is_exempt || false
@@ -343,6 +380,17 @@ export const useAuthStore = defineStore("auth", () => {
       .join("");
   }
 
+  // Utility function to get company initials for logo fallback
+  function getCompanyInitials(): string {
+    const name = currentCompany.value?.name;
+    if (!name) return "";
+    return name
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase())
+      .slice(0, 2)
+      .join("");
+  }
+
   // Locale management
   const locale = ref<string>(localStorage.getItem("locale") || "en");
 
@@ -385,10 +433,14 @@ export const useAuthStore = defineStore("auth", () => {
     currentUser,
     currentEmployee,
     currentCompany,
+    currentDepartment,
+    currentDepartmentId,
+    companyLogoUrl,
     userRole,
     isAdmin,
     isManager,
     isEmployee,
+    isSupervisor,
     isExemptFromTimeTracking,
     remainingVacationDays,
     workingHours,
@@ -408,6 +460,7 @@ export const useAuthStore = defineStore("auth", () => {
     getEmployeeForCompany,
     getDisplayName,
     getUserInitials,
+    getCompanyInitials,
 
     // Locale
     locale,

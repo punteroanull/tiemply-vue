@@ -18,7 +18,12 @@
       "Bash(docker restart:*)",
       "Bash(docker logs:*)",
       "Bash(cmd //c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(cd:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd //c \"npm run build\")",
+      "Bash(powershell -Command \"cd D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build\")",
+      "Bash(powershell -Command \"& { $env:Path = [System.Environment]::GetEnvironmentVariable\\(''Path'',''Machine''\\) + '';'' + [System.Environment]::GetEnvironmentVariable\\(''Path'',''User''\\); cd D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build 2>&1 }\")"
     ]
   }
 }

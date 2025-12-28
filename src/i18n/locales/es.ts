@@ -3,6 +3,9 @@ export default {
   nav: {
     dashboard: 'Panel',
     workLogs: 'Registro de Horas',
+    schedule: 'Mi Horario',
+    overtime: 'Horas Extra',
+    incidents: 'Incidencias',
     absences: 'Ausencias',
     requests: 'Solicitudes',
     profile: 'Perfil',
@@ -110,7 +113,14 @@ export default {
     exporting: 'Exportando...',
     exportSuccess: 'PDF exportado correctamente',
     exportError: 'Error al exportar PDF',
-    duration: 'Duracion'
+    duration: 'Duracion',
+    source: 'Origen',
+    sourceTypes: {
+      web: 'Web',
+      mobile: 'Movil',
+      nfc: 'NFC',
+      manual: 'Manual'
+    }
   },
 
   // Ausencias
@@ -130,7 +140,14 @@ export default {
     status: 'Estado',
     fullDay: 'Dia completo',
     partialDay: 'Dia parcial',
-    absence: 'Ausencia'
+    absence: 'Ausencia',
+    vacationAvailable: 'Vacaciones disponibles',
+    daysAvailable: '{remaining}/{total} dias disponibles',
+    daysUsed: '{count} dia(s)',
+    pendingRequest: 'Solicitud pendiente',
+    approvedAbsence: 'Ausencia aprobada',
+    clickToEdit: 'Clic para editar',
+    thisMonth: 'Este mes'
   },
 
   // Solicitudes
@@ -141,6 +158,7 @@ export default {
     pending: 'Pendientes',
     approved: 'Aprobadas',
     rejected: 'Rechazadas',
+    partialStatus: 'Parciales',
     noRequests: 'No se encontraron solicitudes',
     noRequestsYet: 'Aun no has enviado ninguna solicitud de ausencia.',
     noFilterResults: 'No se encontraron solicitudes {status}.',
@@ -160,7 +178,49 @@ export default {
     cancelError: 'Error al cancelar la solicitud',
     partial: 'Parcial',
     reason: 'Motivo',
-    actions: 'Acciones'
+    actions: 'Acciones',
+    editRequest: 'Editar Solicitud',
+    saveChanges: 'Guardar Cambios',
+    saving: 'Guardando...',
+    requestUpdated: 'Solicitud actualizada correctamente',
+    updateError: 'Error al actualizar la solicitud',
+    cannotEditApproved: 'No se pueden editar solicitudes ya aprobadas',
+    requestNotFound: 'Solicitud no encontrada',
+    edit: 'Editar',
+    addPeriod: 'Agregar periodo',
+    removePeriod: 'Eliminar periodo',
+    period: 'Periodo',
+    periods: 'Periodos',
+    periodOf: 'Periodo {current} de {total}',
+    approvedDays: 'Dias aprobados',
+    pendingDays: 'Dias pendientes',
+    exceedsAvailable: 'Excede los dias disponibles',
+    exceedsAllowed: 'Excede el maximo permitido',
+    willUseExcess: 'Usara {days} dias extra'
+  },
+
+  // Solicitudes del equipo (Managers)
+  teamRequests: {
+    title: 'Solicitudes del Equipo',
+    pendingReview: 'Pendientes de Revision',
+    reviewed: 'Revisadas',
+    employee: 'Empleado',
+    approve: 'Aprobar',
+    reject: 'Rechazar',
+    approveAll: 'Aprobar Todo',
+    rejectAll: 'Rechazar Todo',
+    rejectionReason: 'Motivo del rechazo',
+    rejectionReasonPlaceholder: 'Ingrese el motivo del rechazo...',
+    approveSuccess: 'Periodo aprobado correctamente',
+    rejectSuccess: 'Periodo rechazado correctamente',
+    approveAllSuccess: 'Todos los periodos aprobados',
+    rejectAllSuccess: 'Todos los periodos rechazados',
+    noTeamRequests: 'No hay solicitudes pendientes de tu equipo',
+    reviewedAt: 'Revisado el',
+    approvePeriod: 'Aprobar periodo',
+    rejectPeriod: 'Rechazar periodo',
+    confirmReject: 'Confirmar Rechazo',
+    periodStatus: 'Estado del periodo'
   },
 
   // Nueva solicitud
@@ -256,5 +316,173 @@ export default {
     spanish: 'Espanol',
     changeLanguage: 'Cambiar idioma',
     languageChanged: 'Idioma cambiado correctamente'
+  },
+
+  // Departamento
+  department: {
+    section: 'Departamento',
+    title: 'Mi Departamento',
+    myDepartment: 'Mi Departamento',
+    info: 'Info del Departamento',
+    name: 'Nombre',
+    description: 'Descripcion',
+    supervisor: 'Supervisor',
+    noSupervisor: 'Sin supervisor asignado',
+    employeeCount: 'Tamano del equipo',
+    employees: 'empleados',
+    colleagues: 'Companeros',
+    noColleagues: 'No hay companeros en este departamento',
+    youAreSupervisor: 'Eres el supervisor de este departamento',
+    noDepartment: 'No estas asignado a ningun departamento',
+    noDepartmentDescription: 'Contacta a tu administrador para ser asignado a un departamento.',
+
+    // Acciones de supervisor
+    supervisorActions: 'Acciones de Supervisor',
+    viewAbsences: 'Ausencias del Departamento',
+    viewRequests: 'Solicitudes Pendientes',
+    viewWorkLogs: 'Registros de Horas',
+    registerAbsence: 'Registrar Ausencia',
+
+    // Vista de ausencias
+    absences: 'Ausencias',
+    absencesDescription: 'Ver y gestionar ausencias del departamento',
+    employee: 'Empleado',
+    allEmployees: 'Todos los Empleados',
+    noAbsences: 'No se encontraron ausencias',
+    noAbsencesDescription: 'No hay ausencias registradas para los filtros seleccionados',
+
+    // Vista de solicitudes
+    requests: 'Solicitudes',
+    requestsDescription: 'Revisar y gestionar solicitudes de ausencia',
+    pendingRequests: 'Solicitudes Pendientes',
+    noRequests: 'No hay solicitudes pendientes',
+    noRequestsDescription: 'No hay solicitudes de ausencia para revisar',
+    approve: 'Aprobar',
+    reject: 'Rechazar',
+    approving: 'Aprobando...',
+    rejecting: 'Rechazando...',
+    requestApproved: 'Solicitud aprobada correctamente',
+    requestRejected: 'Solicitud rechazada correctamente',
+
+    // Vista de registros de horas
+    workLogs: 'Registros de Horas',
+    workLogsDescription: 'Ver registros de horas del departamento',
+    noWorkLogs: 'No se encontraron registros',
+    noWorkLogsDescription: 'No hay registros de horas para los filtros seleccionados',
+
+    // Formulario nueva ausencia
+    registerAbsenceDescription: 'Registrar una ausencia directa para un miembro del equipo',
+    selectEmployee: 'Seleccionar un empleado',
+    absenceCreated: 'Ausencia registrada correctamente',
+    absenceCreateError: 'Error al registrar la ausencia',
+
+    // Calendario
+    calendar: 'Calendario del Departamento',
+    calendarDescription: 'Ver calendario de ausencias del equipo'
+  },
+
+  // Horarios
+  schedule: {
+    title: 'Mi Horario',
+    weeklyView: 'Vista Semanal',
+    thisWeek: 'Esta Semana',
+    previousWeek: 'Semana Anterior',
+    nextWeek: 'Semana Siguiente',
+    noSchedule: 'No tienes un horario asignado',
+    noScheduleDescription: 'Contacta a tu administrador para que te asigne un horario.',
+    totalWeeklyHours: 'Total horas semanales',
+    totalDailyHours: 'Total horas del dia',
+    scheduleTypes: {
+      normal: 'Normal',
+      split: 'Jornada Partida',
+      night: 'Turno Nocturno',
+      guard: 'Guardia',
+      rotating: 'Rotativo'
+    },
+    block: 'Bloque',
+    startTime: 'Inicio',
+    endTime: 'Fin',
+    todaySchedule: 'Horario de Hoy',
+    weekOf: 'Semana del {date}',
+    crossesMidnight: 'Cruza medianoche',
+    nextDay: '(dia siguiente)',
+    noBlocksToday: 'No hay bloques de horario hoy',
+    effectiveFrom: 'Vigente desde',
+    effectiveUntil: 'Vigente hasta'
+  },
+
+  // Horas Extra
+  overtime: {
+    title: 'Horas Extra',
+    summary: 'Resumen Anual',
+    records: 'Registros',
+    totalHours: 'Horas Totales',
+    approved: 'Aprobadas',
+    pending: 'Pendientes',
+    rejected: 'Rechazadas',
+    annualLimit: 'Limite Anual',
+    remaining: 'Restantes',
+    percentageUsed: '{percentage}% utilizado',
+    nearLimit: 'Acercandose al limite anual',
+    atLimit: 'Limite anual alcanzado',
+    automaticRegistration: 'Registro automatico',
+    manualRegistration: 'Registro manual',
+    monthlyBreakdown: 'Desglose Mensual',
+    noRecords: 'No hay registros de horas extra',
+    noRecordsDescription: 'Aun no tienes horas extra registradas.',
+    registeredMessage: 'Se han registrado {hours} horas extra',
+    date: 'Fecha',
+    hours: 'Horas',
+    status: 'Estado',
+    approvedBy: 'Aprobado por',
+    approvedAt: 'Aprobado el',
+    filterByStatus: 'Filtrar por estado',
+    filterByMonth: 'Filtrar por mes',
+    allStatuses: 'Todos los estados',
+    allMonths: 'Todos los meses',
+    year: 'Ano'
+  },
+
+  // Incidencias
+  incidents: {
+    title: 'Incidencias de Turno',
+    types: {
+      unclosed_shift: 'Turno sin cerrar',
+      late_arrival: 'Llegada tardia',
+      early_departure: 'Salida anticipada',
+      missing_checkout: 'Salida no registrada'
+    },
+    statuses: {
+      pending: 'Pendiente',
+      resolved: 'Resuelta',
+      validated: 'Validada',
+      marked_absence: 'Marcada como ausencia'
+    },
+    noIncidents: 'No hay incidencias',
+    noIncidentsDescription: 'No tienes incidencias registradas.',
+    pendingCount: 'Tienes {count} incidencia(s) pendiente(s)',
+    expectedTime: 'Hora esperada',
+    actualTime: 'Hora real',
+    resolvedTime: 'Hora de resolucion',
+    difference: 'Diferencia',
+    minutes: '{count} min',
+    resolvedBy: 'Resuelto por',
+    resolvedAt: 'Resuelto el',
+    resolutionNotes: 'Notas de resolucion',
+    filterByType: 'Filtrar por tipo',
+    filterByStatus: 'Filtrar por estado',
+    allTypes: 'Todos los tipos',
+    allStatuses: 'Todos los estados',
+    date: 'Fecha'
+  },
+
+  // Registro de trabajo (ampliado)
+  workLog: {
+    nightShift: 'Turno nocturno',
+    shiftDate: 'Dia del turno',
+    effectiveHours: 'Horas efectivas',
+    overtimeRegistered: 'Horas extra registradas',
+    nightShiftIndicator: 'Estas en turno nocturno',
+    shiftDateDifferent: 'Dia del turno: {date}'
   }
 }
