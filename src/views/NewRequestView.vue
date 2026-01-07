@@ -55,15 +55,6 @@ const affectsVacationBalance = computed(() => {
   return selectedTypeDetails.value?.affectsVacationBalance ?? false;
 });
 
-// Get company vacation excess settings
-const allowVacationExcess = computed(() => {
-  return authStore.currentCompany?.allowVacationExcess ?? false;
-});
-
-const maxVacationExcessDays = computed(() => {
-  return authStore.currentCompany?.maxVacationExcessDays ?? null;
-});
-
 // Calculate days for a single period
 function calculatePeriodDays(period: Period): number {
   if (!period.startDate || !period.endDate) return 0;
@@ -85,15 +76,6 @@ const excessDays = computed(() => {
   return Math.max(0, totalDaysRequested.value - remainingVacationDays.value);
 });
 
-// Check if excess is allowed
-const canUseExcess = computed(() => {
-  if (!affectsVacationBalance.value) return true;
-  if (excessDays.value === 0) return true;
-  if (!allowVacationExcess.value) return false;
-  if (maxVacationExcessDays.value === null) return true;
-  return excessDays.value <= maxVacationExcessDays.value;
-});
-
 // Validation status
 const vacationValidationStatus = computed(() => {
   if (!affectsVacationBalance.value) return { valid: true, message: "" };
@@ -101,15 +83,7 @@ const vacationValidationStatus = computed(() => {
   const excess = excessDays.value;
   if (excess === 0) return { valid: true, message: "" };
 
-  if (!allowVacationExcess.value) {
-    return { valid: false, message: "requests.exceedsAvailable", type: "error" };
-  }
-
-  if (maxVacationExcessDays.value !== null && excess > maxVacationExcessDays.value) {
-    return { valid: false, message: "requests.exceedsAllowed", type: "error" };
-  }
-
-  return { valid: true, message: "requests.willUseExcess", type: "warning", days: excess };
+  return { valid: false, message: "requests.exceedsAvailable", type: "error" };
 });
 
 // Check if a period is valid

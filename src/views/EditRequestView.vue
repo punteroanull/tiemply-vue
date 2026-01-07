@@ -87,7 +87,7 @@ async function loadRequest() {
   // Populate form with existing data
   selectedAbsenceType.value = request.absenceTypeId;
   startDate.value = request.startDate;
-  endDate.value = request.endDate;
+  endDate.value = request.endDate ?? request.startDate;
   isPartial.value = request.isPartial;
   startTime.value = request.startTime || "";
   endTime.value = request.endTime || "";

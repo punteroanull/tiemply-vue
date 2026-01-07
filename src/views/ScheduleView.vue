@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { format, parseISO, addWeeks, subWeeks, startOfWeek } from "date-fns";
+import { format, addWeeks, subWeeks, startOfWeek } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { useSchedulesStore } from "../stores/schedules";
 import ScheduleBlock from "../components/ScheduleBlock.vue";

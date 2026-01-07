@@ -4,7 +4,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { useToast } from "vue-toastification";
 import api from "../services/api";
@@ -84,7 +84,7 @@ const dateLocale = computed(() => locale.value === "es" ? es : enUS);
 function formatDate(dateValue: string | undefined | null): string {
   if (!dateValue) return "-";
   try {
-    const date = parseISO(dateValue);
+    const date = new Date(dateValue);
     return format(date, "MMM d, yyyy", { locale: dateLocale.value });
   } catch {
     return "-";
@@ -341,7 +341,7 @@ onMounted(async () => {
               <td class="px-6 py-4 whitespace-nowrap">
                 <span class="font-medium text-neutral-800">{{ request.absenceType?.name || t('absences.absence') }}</span>
                 <span v-if="request.isPartial && !request.usesPeriods" class="ml-2 text-xs text-neutral-500">({{ $t('requests.partial') }})</span>
-                <span v-if="request.usesPeriods && request.periods?.length > 1" class="ml-2 text-xs text-neutral-500">
+                <span v-if="request.usesPeriods && request.periods && request.periods.length > 1" class="ml-2 text-xs text-neutral-500">
                   ({{ request.periods.length }} {{ $t('requests.periods') }})
                 </span>
               </td>
@@ -392,7 +392,7 @@ onMounted(async () => {
             <div>
               <span class="font-medium text-neutral-800">{{ request.absenceType?.name || t('absences.absence') }}</span>
               <span v-if="request.isPartial && !request.usesPeriods" class="ml-2 text-xs text-neutral-500">({{ $t('requests.partial') }})</span>
-              <span v-if="request.usesPeriods && request.periods?.length > 1" class="ml-2 text-xs text-neutral-500">
+              <span v-if="request.usesPeriods && request.periods && request.periods.length > 1" class="ml-2 text-xs text-neutral-500">
                 ({{ request.periods.length }} {{ $t('requests.periods') }})
               </span>
             </div>

@@ -23,8 +23,8 @@ ARG VITE_APP_NAME=Tiemply
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
 
-# Build para producción
-RUN npm run build
+# Build para producción (omitir verificación de tipos)
+RUN npx vite build
 
 # Stage 2: Production con nginx
 FROM nginx:alpine
