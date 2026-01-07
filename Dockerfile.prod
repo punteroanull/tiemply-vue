@@ -1,0 +1,55 @@
+# ==========================================
+# Dockerfile de Producción - Tiemply Frontend (Vue.js)
+# ==========================================
+
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copiar archivos de dependencias
+COPY package*.json ./
+
+# Instalar dependencias
+RUN npm ci
+
+# Copiar código fuente
+COPY . .
+
+# Variables de entorno para el build
+ARG VITE_API_URL=https://api.tiemply.com
+ARG VITE_APP_NAME=Tiemply
+
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_APP_NAME=$VITE_APP_NAME
+
+# Build para producción
+RUN npm run build
+
+# Stage 2: Production con nginx
+FROM nginx:alpine
+
+# Copiar build del stage anterior
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Configuración de nginx para SPA (Vue Router)
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    \
+    location / { \
+        try_files $uri $uri/ /index.html; \
+    } \
+    \
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \
+        expires 1y; \
+        add_header Cache-Control "public, immutable"; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+# Exponer puerto 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
