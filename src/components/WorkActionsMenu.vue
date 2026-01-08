@@ -12,6 +12,15 @@ const isLoading = computed(() =>
   workStatusStore.checkingIn || workStatusStore.checkingOut || workStatusStore.gettingLocation
 );
 
+const translatedStateLabel = computed(() => {
+  switch (workStatusStore.currentState) {
+    case 'working': return t('workStatus.working');
+    case 'on_break': return t('workStatus.onBreak');
+    case 'offsite': return t('workStatus.offsite');
+    default: return t('workStatus.notWorking');
+  }
+});
+
 const actions = computed(() => {
   const state = workStatusStore.currentState;
 
@@ -119,7 +128,7 @@ function closeMenu() {
 
       <!-- Status Badge inline -->
       <span v-else class="font-medium">
-        {{ workStatusStore.stateLabel }}
+        {{ translatedStateLabel }}
       </span>
 
       <!-- Duration if checked in -->

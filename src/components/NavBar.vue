@@ -88,6 +88,7 @@ onUnmounted(() => {
           </button>
 
           <div class="ml-4 flex items-center">
+            <img src="/favicon.svg" alt="Tiemply" class="h-7 w-7 mr-2" />
             <span class="text-xl font-semibold text-primary-600">Tiemply</span>
           </div>
         </div>

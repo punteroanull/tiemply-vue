@@ -20,6 +20,15 @@ const isLoading = computed(() =>
   workStatusStore.checkingIn || workStatusStore.checkingOut || workStatusStore.gettingLocation
 );
 
+const translatedStateLabel = computed(() => {
+  switch (workStatusStore.currentState) {
+    case 'working': return t('workStatus.working');
+    case 'on_break': return t('workStatus.onBreak');
+    case 'offsite': return t('workStatus.offsite');
+    default: return t('workStatus.notWorking');
+  }
+});
+
 // Actions based on current state
 const availableActions = computed(() => {
   const state = workStatusStore.currentState;
@@ -205,7 +214,7 @@ onUnmounted(() => {
       </svg>
 
       <!-- State Label -->
-      <span v-else>{{ workStatusStore.stateLabel }}</span>
+      <span v-else>{{ translatedStateLabel }}</span>
 
       <!-- Duration -->
       <span

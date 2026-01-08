@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 200" width="512" height="200">
+  <!-- Clock icon -->
+  <circle cx="100" cy="100" r="70" fill="none" stroke="#2563eb" stroke-width="10"/>
+  <line x1="100" y1="100" x2="100" y2="55" stroke="#2563eb" stroke-width="8" stroke-linecap="round"/>
+  <line x1="100" y1="100" x2="135" y2="115" stroke="#2563eb" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="100" cy="100" r="6" fill="#2563eb"/>
+
+  <!-- Text "Tiemply" -->
+  <text x="200" y="125" font-family="Inter, Arial, sans-serif" font-size="80" font-weight="600" fill="#2563eb">Tiemply</text>
+</svg>
