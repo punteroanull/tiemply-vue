@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import DashboardView from '../views/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import RegisterView from '../views/auth/RegisterView.vue'
+import InvitationView from '../views/auth/InvitationView.vue'
 import ProfileView from '../views/ProfileView.vue'
 import WorkLogsView from '../views/WorkLogsView.vue'
 import ScheduleView from '../views/ScheduleView.vue'
@@ -43,6 +44,12 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView,
+      meta: { guest: true }
+    },
+    {
+      path: '/invitation/:token',
+      name: 'invitation',
+      component: InvitationView,
       meta: { guest: true }
     },
     {

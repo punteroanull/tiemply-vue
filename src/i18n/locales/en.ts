@@ -15,6 +15,24 @@ export default {
     employee: 'Employee'
   },
 
+  // Invitation
+  invitation: {
+    title: 'Complete your registration',
+    welcomeMessage: 'You have been invited to join {company}. Complete your registration to get started.',
+    firstName: 'First name',
+    lastName: 'Last name',
+    address: 'Address',
+    optionalFields: 'Optional fields - you can complete these later',
+    completeButton: 'Complete registration',
+    completing: 'Completing...',
+    invalidTitle: 'Invalid invitation',
+    notFound: 'The invitation does not exist or the link is incorrect.',
+    expiredOrUsed: 'This invitation has expired or has already been used.',
+    loadError: 'Error loading the invitation. Please try again.',
+    completeError: 'Error completing registration. Please try again.',
+    goToLogin: 'Go to login'
+  },
+
   // Authentication
   auth: {
     signIn: 'Sign in to your account',

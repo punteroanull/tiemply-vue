@@ -15,6 +15,24 @@ export default {
     employee: 'Empleado'
   },
 
+  // Invitacion
+  invitation: {
+    title: 'Completa tu registro',
+    welcomeMessage: 'Has sido invitado a unirte a {company}. Completa tu registro para empezar.',
+    firstName: 'Nombre',
+    lastName: 'Apellido',
+    address: 'Direccion',
+    optionalFields: 'Campos opcionales - puedes completarlos mas tarde',
+    completeButton: 'Completar registro',
+    completing: 'Completando...',
+    invalidTitle: 'Invitacion no valida',
+    notFound: 'La invitacion no existe o el enlace es incorrecto.',
+    expiredOrUsed: 'Esta invitacion ha expirado o ya ha sido utilizada.',
+    loadError: 'Error al cargar la invitacion. Intenta de nuevo.',
+    completeError: 'Error al completar el registro. Intenta de nuevo.',
+    goToLogin: 'Ir a iniciar sesion'
+  },
+
   // Autenticacion
   auth: {
     signIn: 'Inicia sesion en tu cuenta',
