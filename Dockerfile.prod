@@ -17,7 +17,7 @@ RUN npm ci
 COPY . .
 
 # Variables de entorno para el build
-ARG VITE_API_URL=https://api.tiemply.com
+ARG VITE_API_URL=https://api.tiemply.com/api
 ARG VITE_APP_NAME=Tiemply
 
 ENV VITE_API_URL=$VITE_API_URL
