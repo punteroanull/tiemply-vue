@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { useWorkStatusStore } from '../stores/workStatus';
 import StatusBadge from './StatusBadge.vue';
 
+const { t } = useI18n();
 const workStatusStore = useWorkStatusStore();
 
 const isMenuOpen = ref(false);
@@ -16,7 +18,7 @@ const actions = computed(() => {
   if (state === 'not_working') {
     return [{
       id: 'start_shift',
-      label: 'Start Shift',
+      label: t('workStatus.startShift'),
       icon: '▶',
       action: () => workStatusStore.startShift(),
       class: 'bg-green-600 hover:bg-green-700 text-white'
@@ -27,21 +29,21 @@ const actions = computed(() => {
     return [
       {
         id: 'start_break',
-        label: 'Start Break',
+        label: t('workStatus.startBreak'),
         icon: '☕',
         action: () => workStatusStore.startBreak(),
         class: 'bg-amber-500 hover:bg-amber-600 text-white'
       },
       {
         id: 'start_offsite',
-        label: 'Go Offsite',
+        label: t('workStatus.goOffsite'),
         icon: '📍',
         action: () => workStatusStore.startOffsite(),
         class: 'bg-blue-500 hover:bg-blue-600 text-white'
       },
       {
         id: 'end_shift',
-        label: 'End Shift',
+        label: t('workStatus.endShift'),
         icon: '⏹',
         action: () => workStatusStore.endShift(),
         class: 'bg-red-500 hover:bg-red-600 text-white'
@@ -52,7 +54,7 @@ const actions = computed(() => {
   if (state === 'on_break') {
     return [{
       id: 'end_break',
-      label: 'Return from Break',
+      label: t('workStatus.returnFromBreak'),
       icon: '↩',
       action: () => workStatusStore.endBreak(),
       class: 'bg-green-600 hover:bg-green-700 text-white'
@@ -62,7 +64,7 @@ const actions = computed(() => {
   if (state === 'offsite') {
     return [{
       id: 'end_offsite',
-      label: 'Return to Office',
+      label: t('workStatus.returnToOffice'),
       icon: '↩',
       action: () => workStatusStore.endOffsite(),
       class: 'bg-green-600 hover:bg-green-700 text-white'
@@ -191,8 +193,8 @@ function closeMenu() {
               ]"
             />
             <span class="text-gray-500 dark:text-gray-400">
-              {{ workStatusStore.locationError ? 'Location error' :
-                 workStatusStore.locationData ? 'Location available' : 'Location pending' }}
+              {{ workStatusStore.locationError ? t('geolocation.locationError') :
+                 workStatusStore.locationData ? t('geolocation.locationAvailable') : t('geolocation.locationPending') }}
             </span>
           </div>
         </div>

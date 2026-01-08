@@ -506,5 +506,40 @@ export default {
     overtimeRegistered: 'Overtime registered',
     nightShiftIndicator: 'You are on night shift',
     shiftDateDifferent: 'Shift date: {date}'
+  },
+
+  // Geolocation
+  geolocation: {
+    title: 'Location Services',
+    description: 'Manage location tracking for check-in and check-out',
+    notSupported: 'Geolocation is not supported by your browser',
+    disabledForCompany: 'Geolocation is disabled for your company',
+    permissionNeeded: 'Location permission is needed for check-in/check-out',
+    locationRequired: 'Location is required for check-in/check-out',
+    locationOptional: 'Location will be requested during check-in/check-out',
+    permissionFailed: 'Failed to get location permission',
+    enabled: 'Location Enabled',
+    permissionRequired: 'Permission Required',
+    disabled: 'Location Disabled',
+    unavailable: 'Location Unavailable',
+    grantPermission: 'Grant Permission',
+    settings: 'Settings',
+    required: 'Required',
+    optional: 'Optional',
+    usedForBoth: 'Used for both check-in and check-out',
+    dataSecure: 'Data is stored securely',
+    troubleshooting: 'Troubleshooting',
+    lastKnownLocation: 'Last Known Location',
+    coordinates: 'Coordinates',
+    address: 'Address',
+    obtained: 'Obtained',
+    troubleshootingIntro: "If you're having trouble with location permissions:",
+    troubleshootingStep1: "Click the location icon in your browser's address bar",
+    troubleshootingStep2: 'Select "Allow" for location access',
+    troubleshootingStep3: 'Refresh the page and try again',
+    troubleshootingStep4: 'For mobile: Check your browser location settings',
+    locationError: 'Location error',
+    locationAvailable: 'Location available',
+    locationPending: 'Location pending'
   }
 }

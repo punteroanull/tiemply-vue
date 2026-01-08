@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from "vue";
+import { useI18n } from "vue-i18n";
 import { useWorkStatusStore } from "../stores/workStatus";
 import {
   isGeolocationAvailable,
   checkGeolocationPermission,
 } from "../utils/geolocation";
 
+const { t } = useI18n();
 const workStatusStore = useWorkStatusStore();
 const hasGeolocationPermission = ref(false);
 
@@ -14,7 +16,7 @@ const geolocationStatus = computed(() => {
     return {
       available: false,
       status: "unavailable",
-      message: "Geolocation is not supported by your browser",
+      message: t("geolocation.notSupported"),
       icon: "unavailable",
     };
   }
@@ -23,7 +25,7 @@ const geolocationStatus = computed(() => {
     return {
       available: true,
       status: "disabled",
-      message: "Geolocation is disabled for your company",
+      message: t("geolocation.disabledForCompany"),
       icon: "disabled",
     };
   }
@@ -32,7 +34,7 @@ const geolocationStatus = computed(() => {
     return {
       available: true,
       status: "permission-needed",
-      message: "Location permission is needed for check-in/check-out",
+      message: t("geolocation.permissionNeeded"),
       icon: "permission",
     };
   }
@@ -41,8 +43,8 @@ const geolocationStatus = computed(() => {
     available: true,
     status: "enabled",
     message: workStatusStore.isGeolocationRequired
-      ? "Location is required for check-in/check-out"
-      : "Location will be requested during check-in/check-out",
+      ? t("geolocation.locationRequired")
+      : t("geolocation.locationOptional"),
     icon: "enabled",
   };
 });
@@ -118,9 +120,9 @@ onMounted(async () => {
   <div class="card">
     <div class="flex items-start justify-between mb-4">
       <div>
-        <h3 class="text-lg font-medium text-neutral-800">Location Services</h3>
+        <h3 class="text-lg font-medium text-neutral-800">{{ t('geolocation.title') }}</h3>
         <p class="text-sm text-neutral-600 mt-1">
-          Manage location tracking for check-in and check-out
+          {{ t('geolocation.description') }}
         </p>
       </div>
     </div>
@@ -139,12 +141,12 @@ onMounted(async () => {
             <p class="font-medium">
               {{
                 geolocationStatus.status === "enabled"
-                  ? "Location Enabled"
+                  ? t('geolocation.enabled')
                   : geolocationStatus.status === "permission-needed"
-                  ? "Permission Required"
+                  ? t('geolocation.permissionRequired')
                   : geolocationStatus.status === "disabled"
-                  ? "Location Disabled"
-                  : "Location Unavailable"
+                  ? t('geolocation.disabled')
+                  : t('geolocation.unavailable')
               }}
             </p>
             <p class="text-sm mt-1">{{ geolocationStatus.message }}</p>
@@ -155,7 +157,7 @@ onMounted(async () => {
             @click="requestLocationPermission"
             class="btn-primary text-sm px-3 py-1"
           >
-            Grant Permission
+            {{ t('geolocation.grantPermission') }}
           </button>
         </div>
 
@@ -165,7 +167,7 @@ onMounted(async () => {
           class="mt-3 space-y-2"
         >
           <div class="text-sm">
-            <span class="font-medium">Settings:</span>
+            <span class="font-medium">{{ t('geolocation.settings') }}:</span>
             <ul class="mt-1 space-y-1 text-xs">
               <li class="flex items-center">
                 <svg
@@ -187,8 +189,8 @@ onMounted(async () => {
                 </svg>
                 {{
                   workStatusStore.isGeolocationRequired
-                    ? "Required"
-                    : "Optional"
+                    ? t('geolocation.required')
+                    : t('geolocation.optional')
                 }}
               </li>
               <li class="flex items-center">
@@ -204,7 +206,7 @@ onMounted(async () => {
                     clip-rule="evenodd"
                   />
                 </svg>
-                Used for both check-in and check-out
+                {{ t('geolocation.usedForBoth') }}
               </li>
               <li class="flex items-center">
                 <svg
@@ -219,7 +221,7 @@ onMounted(async () => {
                     clip-rule="evenodd"
                   />
                 </svg>
-                Data is stored securely
+                {{ t('geolocation.dataSecure') }}
               </li>
             </ul>
           </div>
@@ -232,15 +234,15 @@ onMounted(async () => {
         >
           <details class="text-sm">
             <summary class="cursor-pointer font-medium hover:text-neutral-900">
-              Troubleshooting
+              {{ t('geolocation.troubleshooting') }}
             </summary>
             <div class="mt-2 space-y-2 text-xs">
-              <p>If you're having trouble with location permissions:</p>
+              <p>{{ t('geolocation.troubleshootingIntro') }}</p>
               <ol class="list-decimal list-inside space-y-1 ml-2">
-                <li>Click the location icon in your browser's address bar</li>
-                <li>Select "Allow" for location access</li>
-                <li>Refresh the page and try again</li>
-                <li>For mobile: Check your browser's location settings</li>
+                <li>{{ t('geolocation.troubleshootingStep1') }}</li>
+                <li>{{ t('geolocation.troubleshootingStep2') }}</li>
+                <li>{{ t('geolocation.troubleshootingStep3') }}</li>
+                <li>{{ t('geolocation.troubleshootingStep4') }}</li>
               </ol>
             </div>
           </details>
@@ -254,19 +256,19 @@ onMounted(async () => {
       class="mt-4 p-3 bg-neutral-50 rounded-lg"
     >
       <h4 class="text-sm font-medium text-neutral-800 mb-2">
-        Last Known Location
+        {{ t('geolocation.lastKnownLocation') }}
       </h4>
       <div class="space-y-1 text-xs text-neutral-600">
         <p>
-          <span class="font-medium">Coordinates:</span>
+          <span class="font-medium">{{ t('geolocation.coordinates') }}:</span>
           {{ workStatusStore.formattedLocation }}
         </p>
         <p v-if="workStatusStore.locationData.address">
-          <span class="font-medium">Address:</span>
+          <span class="font-medium">{{ t('geolocation.address') }}:</span>
           {{ workStatusStore.locationData.address }}
         </p>
         <p>
-          <span class="font-medium">Obtained:</span>
+          <span class="font-medium">{{ t('geolocation.obtained') }}:</span>
           {{
             new Date(workStatusStore.locationData.timestamp).toLocaleString()
           }}

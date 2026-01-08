@@ -506,5 +506,40 @@ export default {
     overtimeRegistered: 'Horas extra registradas',
     nightShiftIndicator: 'Estas en turno nocturno',
     shiftDateDifferent: 'Dia del turno: {date}'
+  },
+
+  // Geolocalizacion
+  geolocation: {
+    title: 'Servicios de Ubicacion',
+    description: 'Gestionar seguimiento de ubicacion para entrada y salida',
+    notSupported: 'La geolocalizacion no es compatible con tu navegador',
+    disabledForCompany: 'La geolocalizacion esta deshabilitada para tu empresa',
+    permissionNeeded: 'Se necesita permiso de ubicacion para entrada/salida',
+    locationRequired: 'La ubicacion es requerida para entrada/salida',
+    locationOptional: 'Se solicitara ubicacion durante entrada/salida',
+    permissionFailed: 'Error al obtener permiso de ubicacion',
+    enabled: 'Ubicacion Habilitada',
+    permissionRequired: 'Permiso Requerido',
+    disabled: 'Ubicacion Deshabilitada',
+    unavailable: 'Ubicacion No Disponible',
+    grantPermission: 'Conceder Permiso',
+    settings: 'Configuracion',
+    required: 'Requerida',
+    optional: 'Opcional',
+    usedForBoth: 'Se usa para entrada y salida',
+    dataSecure: 'Los datos se almacenan de forma segura',
+    troubleshooting: 'Solucion de problemas',
+    lastKnownLocation: 'Ultima Ubicacion Conocida',
+    coordinates: 'Coordenadas',
+    address: 'Direccion',
+    obtained: 'Obtenida',
+    troubleshootingIntro: 'Si tienes problemas con los permisos de ubicacion:',
+    troubleshootingStep1: 'Haz clic en el icono de ubicacion en la barra de direcciones',
+    troubleshootingStep2: 'Selecciona "Permitir" para el acceso a ubicacion',
+    troubleshootingStep3: 'Actualiza la pagina e intenta de nuevo',
+    troubleshootingStep4: 'En movil: Revisa la configuracion de ubicacion del navegador',
+    locationError: 'Error de ubicacion',
+    locationAvailable: 'Ubicacion disponible',
+    locationPending: 'Ubicacion pendiente'
   }
 }
