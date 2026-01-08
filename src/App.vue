@@ -31,8 +31,16 @@ const isReady = computed(() => {
 })
 
 onMounted(async () => {
+  console.log("App.vue - onMounted started")
+  console.log("App.vue - waiting for router.isReady()...")
+
   // Wait for router to be ready before doing anything
   await router.isReady()
+
+  console.log("App.vue - router is ready!")
+  console.log("App.vue - route.name:", route.name)
+  console.log("App.vue - route.path:", route.path)
+
   routerReady.value = true
 
   if (authStore.token) {
@@ -41,6 +49,7 @@ onMounted(async () => {
     console.log("App.vue - user fetched:", authStore.user)
   }
   initializing.value = false
+  console.log("App.vue - initialization complete, isAuthRoute:", isAuthRoute.value)
 })
 
 watch(() => authStore.isAuthenticated, (newValue) => {

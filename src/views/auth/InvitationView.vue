@@ -106,6 +106,7 @@ async function handleSubmit() {
 }
 
 onMounted(() => {
+  console.log("InvitationView - onMounted, token:", token)
   loadInvitation()
 })
 </script>

@@ -152,17 +152,23 @@ const router = createRouter({
 })
 
 router.beforeEach((to, _from, next) => {
+  console.log("Router beforeEach - navigating to:", to.name, to.path)
   const authStore = useAuthStore()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    console.log("Router - redirecting to login (requiresAuth)")
     next({ name: 'login' })
   } else if (to.meta.guest && authStore.isAuthenticated) {
+    console.log("Router - redirecting to dashboard (guest but authenticated)")
     next({ name: 'dashboard' })
   } else if (to.meta.requiresManager && !authStore.isManager && !authStore.isAdmin) {
+    console.log("Router - redirecting to dashboard (requiresManager)")
     next({ name: 'dashboard' })
   } else if (to.meta.requiresSupervisor && !authStore.isSupervisor && !authStore.isAdmin) {
+    console.log("Router - redirecting to dashboard (requiresSupervisor)")
     next({ name: 'dashboard' })
   } else {
+    console.log("Router - allowing navigation")
     next()
   }
 })
