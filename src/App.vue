@@ -12,7 +12,7 @@ const route = useRoute()
 const initializing = ref(true)
 
 const isAuthRoute = computed(() => {
-  return route.path === '/login' || route.path === '/register'
+  return route.path === '/login' || route.path === '/register' || route.path.startsWith('/invitation/')
 })
 
 // Only show app layout when user data is fully loaded
