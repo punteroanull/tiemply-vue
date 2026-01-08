@@ -39,9 +39,12 @@ async function loadInvitation() {
   try {
     loading.value = true
     error.value = ''
+    console.log('Loading invitation with token:', token)
     const response = await api.get(`/invitations/${token}`)
+    console.log('API response:', response.data)
     invitation.value = response.data.data.invitation
   } catch (err: any) {
+    console.error('Error loading invitation:', err)
     if (err.response?.status === 410) {
       error.value = err.response.data.message || t('invitation.expiredOrUsed')
     } else if (err.response?.status === 404) {

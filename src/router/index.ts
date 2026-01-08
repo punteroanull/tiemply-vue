@@ -50,7 +50,7 @@ const router = createRouter({
       path: '/invitation/:token',
       name: 'invitation',
       component: InvitationView,
-      meta: { guest: true }
+      meta: { public: true }
     },
     {
       path: '/profile',
