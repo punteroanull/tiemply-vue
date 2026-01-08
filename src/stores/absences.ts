@@ -89,19 +89,24 @@ export const useAbsencesStore = defineStore("absences", () => {
   const submitting = ref(false);
   const reviewing = ref(false);
 
+  // Helper function to extract array data from API response
+  function extractArrayData<T>(response: any): T[] {
+    let data;
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      data = response.data.data;
+    } else {
+      data = response.data;
+    }
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : [];
+  }
+
   async function fetchAbsenceTypes() {
     loading.value = true;
 
     try {
       const response = await api.get("/absence-types");
-      // Backend uses ApiResponse trait: { success: true, data: [...] }
-      // Axios response is in response.data, so actual data is in response.data.data
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        absenceTypes.value = response.data.data;
-      } else {
-        // Fallback for direct array response
-        absenceTypes.value = response.data;
-      }
+      absenceTypes.value = extractArrayData<AbsenceType>(response);
     } catch (error) {
       console.error("Error fetching absence types:", error);
       toast.error("Failed to fetch absence types");
@@ -122,14 +127,7 @@ export const useAbsencesStore = defineStore("absences", () => {
       }
 
       const response = await api.get(`/employees/${employeeId}/absences`);
-      // Backend uses ApiResponse trait: { success: true, data: [...] }
-      // Axios response is in response.data, so actual data is in response.data.data
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        absences.value = response.data.data;
-      } else {
-        // Fallback for direct array response
-        absences.value = response.data;
-      }
+      absences.value = extractArrayData<Absence>(response);
     } catch (error) {
       console.error("Error fetching absences:", error);
       toast.error("Failed to fetch your absences");
@@ -152,14 +150,7 @@ export const useAbsencesStore = defineStore("absences", () => {
       const response = await api.get(
         `/employees/${employeeId}/absence-requests`
       );
-      // Backend uses ApiResponse trait: { success: true, data: [...] }
-      // Axios response is in response.data, so actual data is in response.data.data
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        requests.value = response.data.data;
-      } else {
-        // Fallback for direct array response
-        requests.value = response.data;
-      }
+      requests.value = extractArrayData<AbsenceRequest>(response);
     } catch (error) {
       console.error("Error fetching absence requests:", error);
       toast.error("Failed to fetch your absence requests");
@@ -182,14 +173,7 @@ export const useAbsencesStore = defineStore("absences", () => {
       const response = await api.get(
         `/requests/pending/employee/${employeeId}`
       );
-      // Backend uses ApiResponse trait: { success: true, data: [...] }
-      // Axios response is in response.data, so actual data is in response.data.data
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        pendingRequests.value = response.data.data;
-      } else {
-        // Fallback for direct array response
-        pendingRequests.value = response.data;
-      }
+      pendingRequests.value = extractArrayData<AbsenceRequest>(response);
     } catch (error) {
       console.error("Error fetching pending requests:", error);
       toast.error("Failed to fetch your pending requests");
@@ -276,11 +260,7 @@ export const useAbsencesStore = defineStore("absences", () => {
 
     try {
       const response = await api.get('/requests/pending');
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        teamPendingRequests.value = response.data.data;
-      } else {
-        teamPendingRequests.value = response.data;
-      }
+      teamPendingRequests.value = extractArrayData<AbsenceRequest>(response);
     } catch (error) {
       console.error("Error fetching team pending requests:", error);
       toast.error("Failed to fetch team pending requests");

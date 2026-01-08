@@ -396,7 +396,11 @@ export default {
 
     // Calendar
     calendar: 'Department Calendar',
-    calendarDescription: 'View team absences calendar'
+    calendarDescription: 'View team absences calendar',
+
+    // Clock-in indicator
+    clockedIn: 'Clocked in today',
+    notClockedIn: 'Not clocked in today'
   },
 
   // Schedules

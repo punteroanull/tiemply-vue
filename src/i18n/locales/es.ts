@@ -396,7 +396,11 @@ export default {
 
     // Calendario
     calendar: 'Calendario del Departamento',
-    calendarDescription: 'Ver calendario de ausencias del equipo'
+    calendarDescription: 'Ver calendario de ausencias del equipo',
+
+    // Indicador de fichaje
+    clockedIn: 'Fichó hoy',
+    notClockedIn: 'No ha fichado hoy'
   },
 
   // Horarios

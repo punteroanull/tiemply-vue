@@ -270,10 +270,17 @@ watch(
             :key="employee.id"
             class="flex items-center"
           >
-            <div
-              class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm"
-            >
-              {{ getEmployeeName(employee).charAt(0).toUpperCase() }}
+            <div class="relative">
+              <div
+                class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm"
+              >
+                {{ getEmployeeName(employee).charAt(0).toUpperCase() }}
+              </div>
+              <span
+                class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white"
+                :class="employee.hasClockedInToday ? 'bg-green-500' : 'bg-red-500'"
+                :title="employee.hasClockedInToday ? $t('department.clockedIn') : $t('department.notClockedIn')"
+              ></span>
             </div>
             <div class="ml-3 flex-1 min-w-0">
               <p class="text-sm font-medium text-neutral-800 truncate">

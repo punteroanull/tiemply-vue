@@ -31,6 +31,7 @@ interface DepartmentEmployee {
   contractEndTime?: string;
   remainingVacationDays?: number;
   active?: boolean;
+  hasClockedInToday?: boolean;
   user?: {
     id: string;
     name: string;

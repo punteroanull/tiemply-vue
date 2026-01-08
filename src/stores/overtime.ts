@@ -18,12 +18,24 @@ export const useOvertimeStore = defineStore("overtime", () => {
   const records = ref<OvertimeRecord[]>([]);
   const loading = ref(false);
 
-  // Helper function to extract data from API response
+  // Helper function to extract data from API response (for single objects)
   function extractData<T>(response: any): T {
     if (response.data && typeof response.data === "object" && "data" in response.data) {
       return response.data.data;
     }
     return response.data;
+  }
+
+  // Helper function to extract array data from API response
+  function extractArrayData<T>(response: any): T[] {
+    let data;
+    if (response.data && typeof response.data === "object" && "data" in response.data) {
+      data = response.data.data;
+    } else {
+      data = response.data;
+    }
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : [];
   }
 
   // Computed
@@ -112,7 +124,7 @@ export const useOvertimeStore = defineStore("overtime", () => {
       if (filters?.dateUntil) params.append("date_until", filters.dateUntil);
 
       const response = await api.get(`/overtime?${params.toString()}`);
-      records.value = extractData<OvertimeRecord[]>(response);
+      records.value = extractArrayData<OvertimeRecord>(response);
     } catch (error: any) {
       console.error("Error fetching overtime records:", error);
       toast.error("Failed to fetch overtime records");

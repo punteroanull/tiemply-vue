@@ -18,12 +18,16 @@ export const useIncidentsStore = defineStore("incidents", () => {
   const incidents = ref<Incident[]>([]);
   const loading = ref(false);
 
-  // Helper function to extract data from API response
-  function extractData<T>(response: any): T {
+  // Helper function to extract array data from API response
+  function extractArrayData<T>(response: any): T[] {
+    let data;
     if (response.data && typeof response.data === "object" && "data" in response.data) {
-      return response.data.data;
+      data = response.data.data;
+    } else {
+      data = response.data;
     }
-    return response.data;
+    // Ensure we always return an array
+    return Array.isArray(data) ? data : [];
   }
 
   // Computed
@@ -98,7 +102,7 @@ export const useIncidentsStore = defineStore("incidents", () => {
       if (filters?.endDate) params.append("end_date", filters.endDate);
 
       const response = await api.get(`/incidents?${params.toString()}`);
-      incidents.value = extractData<Incident[]>(response);
+      incidents.value = extractArrayData<Incident>(response);
     } catch (error: any) {
       console.error("Error fetching incidents:", error);
       toast.error("Failed to fetch incidents");
