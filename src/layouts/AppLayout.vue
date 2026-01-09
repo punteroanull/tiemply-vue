@@ -46,7 +46,7 @@ async function handleLogout() {
         @close="closeSidebar"
       />
       
-      <main class="flex-1 p-4 sm:p-6 md:p-8 transition-all duration-300" 
+      <main class="flex-1 p-4 sm:p-6 md:p-8 transition-all duration-300 overflow-x-hidden min-w-0"
         :class="{ 'md:pl-64': isSidebarOpen }">
         <router-view />
         

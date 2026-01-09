@@ -178,7 +178,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="container mx-auto px-4 py-4">
+  <div class="container mx-auto px-4 py-4 overflow-x-hidden">
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
       <h1 class="text-2xl font-bold text-neutral-800">{{ $t('requests.title') }}</h1>
       <button
