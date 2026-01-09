@@ -190,7 +190,7 @@ onMounted(async () => {
             </h2>
 
             <!-- Filters -->
-            <div class="flex items-center gap-3">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <select
                 v-model="selectedStatus"
                 class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
@@ -218,59 +218,90 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Records table -->
-        <div v-if="filteredRecords.length > 0" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-neutral-200">
-            <thead class="bg-neutral-50">
-              <tr>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ t("overtime.date") }}
-                </th>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ t("overtime.hours") }}
-                </th>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ t("overtime.status") }}
-                </th>
-                <th
-                  class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ t("overtime.approvedBy") }}
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-neutral-200">
-              <tr
-                v-for="record in filteredRecords"
-                :key="record.id"
-                class="hover:bg-neutral-50"
-              >
-                <td class="px-4 py-3 text-sm text-neutral-900">
-                  {{ formatDate(record.date) }}
-                </td>
-                <td class="px-4 py-3 text-sm font-medium text-neutral-900">
-                  {{ formatHours(record.hours) }}
-                </td>
-                <td class="px-4 py-3">
-                  <span
-                    :class="getStatusBadgeClass(record.status)"
-                    class="px-2 py-1 rounded-full text-xs font-medium"
+        <!-- Records table - Desktop -->
+        <div v-if="filteredRecords.length > 0">
+          <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-neutral-200">
+              <thead class="bg-neutral-50">
+                <tr>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                   >
-                    {{ getStatusLabel(record.status) }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-sm text-neutral-500">
-                  {{ record.approvedBy || "-" }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                    {{ t("overtime.date") }}
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ t("overtime.hours") }}
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ t("overtime.status") }}
+                  </th>
+                  <th
+                    class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ t("overtime.approvedBy") }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-neutral-200">
+                <tr
+                  v-for="record in filteredRecords"
+                  :key="record.id"
+                  class="hover:bg-neutral-50"
+                >
+                  <td class="px-4 py-3 text-sm text-neutral-900">
+                    {{ formatDate(record.date) }}
+                  </td>
+                  <td class="px-4 py-3 text-sm font-medium text-neutral-900">
+                    {{ formatHours(record.hours) }}
+                  </td>
+                  <td class="px-4 py-3">
+                    <span
+                      :class="getStatusBadgeClass(record.status)"
+                      class="px-2 py-1 rounded-full text-xs font-medium"
+                    >
+                      {{ getStatusLabel(record.status) }}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-sm text-neutral-500">
+                    {{ record.approvedBy || "-" }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Records - Mobile cards -->
+          <div class="md:hidden divide-y divide-neutral-200">
+            <div
+              v-for="record in filteredRecords"
+              :key="record.id"
+              class="p-4"
+            >
+              <div class="flex justify-between items-start mb-2">
+                <span class="text-sm font-medium text-neutral-900">
+                  {{ formatDate(record.date) }}
+                </span>
+                <span
+                  :class="getStatusBadgeClass(record.status)"
+                  class="px-2 py-1 rounded-full text-xs font-medium"
+                >
+                  {{ getStatusLabel(record.status) }}
+                </span>
+              </div>
+              <div class="flex justify-between items-center text-sm">
+                <span class="text-neutral-500">{{ t("overtime.hours") }}:</span>
+                <span class="font-medium text-neutral-900">{{ formatHours(record.hours) }}</span>
+              </div>
+              <div v-if="record.approvedBy" class="flex justify-between items-center text-sm mt-1">
+                <span class="text-neutral-500">{{ t("overtime.approvedBy") }}:</span>
+                <span class="text-neutral-600">{{ record.approvedBy }}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Empty state -->

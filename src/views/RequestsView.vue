@@ -196,14 +196,14 @@ onMounted(async () => {
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <!-- Vacation Days Card -->
       <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
-        <div class="flex items-center">
+        <div class="flex items-center min-w-0">
           <div class="flex-shrink-0 h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" />
             </svg>
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-neutral-500">{{ $t('absences.vacationAvailable') }}</p>
+          <div class="ml-4 min-w-0">
+            <p class="text-sm font-medium text-neutral-500 truncate">{{ $t('absences.vacationAvailable') }}</p>
             <p class="text-xl font-bold text-blue-600">
               {{ $t('absences.daysAvailable', { remaining: remainingVacationDays, total: maxVacationDays }) }}
             </p>
@@ -222,7 +222,7 @@ onMounted(async () => {
           'border-neutral-400': absenceType.code !== 'sick_leave' && absenceType.code !== 'personal_leave'
         }"
       >
-        <div class="flex items-center">
+        <div class="flex items-center min-w-0">
           <div
             class="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center"
             :class="getTypeColorClasses(absenceType.code).icon"
@@ -231,8 +231,8 @@ onMounted(async () => {
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
           </div>
-          <div class="ml-4">
-            <p class="text-sm font-medium text-neutral-500">{{ absenceType.name }}</p>
+          <div class="ml-4 min-w-0">
+            <p class="text-sm font-medium text-neutral-500 truncate">{{ absenceType.name }}</p>
             <p class="text-xl font-bold" :class="getTypeColorClasses(absenceType.code).text">
               {{ $t('absences.daysUsed', { count: absenceType.count }) }}
             </p>
@@ -241,40 +241,40 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Status Filter -->
-    <div class="mb-4">
-      <div class="flex space-x-2 bg-white rounded-lg shadow p-1 inline-flex">
+    <!-- Status Filter - scrollable on mobile -->
+    <div class="mb-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+      <div class="flex space-x-2 bg-white rounded-lg shadow p-1 min-w-max">
         <button
           @click="statusFilter = 'all'"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
           :class="statusFilter === 'all' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
           {{ $t('requests.all') }}
         </button>
         <button
           @click="statusFilter = 'pending'"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
           :class="statusFilter === 'pending' ? 'bg-amber-500 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
           {{ $t('requests.pending') }}
         </button>
         <button
           @click="statusFilter = 'approved'"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
           :class="statusFilter === 'approved' ? 'bg-green-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
           {{ $t('requests.approved') }}
         </button>
         <button
           @click="statusFilter = 'rejected'"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
           :class="statusFilter === 'rejected' ? 'bg-red-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
           {{ $t('requests.rejected') }}
         </button>
         <button
           @click="statusFilter = 'partial'"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
           :class="statusFilter === 'partial' ? 'bg-indigo-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
         >
           {{ $t('requests.partialStatus') }}

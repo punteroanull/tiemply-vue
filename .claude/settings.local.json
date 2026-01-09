@@ -27,7 +27,8 @@
       "Bash(powershell -Command \"cd D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build 2>&1\")",
       "Bash(ls:*)",
       "Bash(npx vite build)",
-      "Bash(npx vue-tsc:*)"
+      "Bash(npx vue-tsc:*)",
+      "Bash(tree:*)"
     ]
   }
 }

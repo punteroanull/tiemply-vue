@@ -194,12 +194,51 @@ onMounted(async () => {
         {{ $t('workLogs.title') }}
       </h1>
 
-      <div class="flex items-center gap-4">
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+        <!-- Tabs - scrollable on mobile -->
+        <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 order-2 sm:order-1">
+          <div class="flex space-x-2 bg-white rounded-lg shadow p-1 min-w-max">
+            <button
+              @click="changeTab('daily')"
+              class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+              :class="
+                activeTab === 'daily'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              "
+            >
+              {{ $t('workLogs.daily') }}
+            </button>
+            <button
+              @click="changeTab('weekly')"
+              class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+              :class="
+                activeTab === 'weekly'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              "
+            >
+              {{ $t('workLogs.weekly') }}
+            </button>
+            <button
+              @click="changeTab('monthly')"
+              class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+              :class="
+                activeTab === 'monthly'
+                  ? 'bg-primary-600 text-white'
+                  : 'text-neutral-600 hover:bg-neutral-100'
+              "
+            >
+              {{ $t('workLogs.monthly') }}
+            </button>
+          </div>
+        </div>
+
         <!-- Export PDF Button -->
         <button
           @click="exportPdf"
           :disabled="isExporting || !activeReport || !activeReport.days || activeReport.days.length === 0"
-          class="flex items-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed"
+          class="flex items-center justify-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed order-1 sm:order-2"
         >
           <svg
             v-if="isExporting"
@@ -237,44 +276,8 @@ onMounted(async () => {
               d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          {{ isExporting ? $t('workLogs.exporting') : $t('workLogs.exportPdf') }}
+          <span class="whitespace-nowrap">{{ isExporting ? $t('workLogs.exporting') : $t('workLogs.exportPdf') }}</span>
         </button>
-
-        <div class="flex space-x-2 bg-white rounded-lg shadow p-1">
-        <button
-          @click="changeTab('daily')"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'daily'
-              ? 'bg-primary-600 text-white'
-              : 'text-neutral-600 hover:bg-neutral-100'
-          "
-        >
-          {{ $t('workLogs.daily') }}
-        </button>
-        <button
-          @click="changeTab('weekly')"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'weekly'
-              ? 'bg-primary-600 text-white'
-              : 'text-neutral-600 hover:bg-neutral-100'
-          "
-        >
-          {{ $t('workLogs.weekly') }}
-        </button>
-        <button
-          @click="changeTab('monthly')"
-          class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-          :class="
-            activeTab === 'monthly'
-              ? 'bg-primary-600 text-white'
-              : 'text-neutral-600 hover:bg-neutral-100'
-          "
-        >
-          {{ $t('workLogs.monthly') }}
-        </button>
-        </div>
       </div>
     </div>
 
@@ -503,73 +506,103 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Table for detailed work logs -->
+            <!-- Table for detailed work logs - Desktop -->
             <div v-if="day.logs && day.logs.length > 0" class="mt-4">
-              <table class="min-w-full divide-y divide-neutral-200">
-                <thead class="bg-neutral-50">
-                  <tr>
-                    <th
-                      scope="col"
-                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                    >
-                      {{ $t('workLogs.time') }}
-                    </th>
-                    <th
-                      scope="col"
-                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                    >
-                      {{ $t('workLogs.type') }}
-                    </th>
-                    <th
-                      scope="col"
-                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                    >
-                      {{ $t('workLogs.category') }}
-                    </th>
-                    <th
-                      scope="col"
-                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                    >
-                      {{ $t('workLogs.notes') }}
-                    </th>
-                    <th
-                      scope="col"
-                      class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                    >
-                      {{ $t('workLogs.source') }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody class="bg-white divide-y divide-neutral-200">
-                  <tr v-for="(log, logIndex) in day.logs" :key="logIndex">
-                    <td
-                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                    >
-                      {{ log.time ? formatTime(log.time) : "-" }}
-                    </td>
-                    <td
-                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                    >
-                      {{ log.type || "-" }}
-                    </td>
-                    <td
-                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                    >
-                      {{ log.category || "-" }}
-                    </td>
-                    <td
-                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                    >
-                      {{ log.notes || "-" }}
-                    </td>
-                    <td
-                      class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                    >
-                      <SourceBadge :source="log.source" size="sm" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <!-- Desktop table -->
+              <div class="hidden md:block overflow-x-auto">
+                <table class="min-w-full divide-y divide-neutral-200">
+                  <thead class="bg-neutral-50">
+                    <tr>
+                      <th
+                        scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                      >
+                        {{ $t('workLogs.time') }}
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                      >
+                        {{ $t('workLogs.type') }}
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                      >
+                        {{ $t('workLogs.category') }}
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                      >
+                        {{ $t('workLogs.notes') }}
+                      </th>
+                      <th
+                        scope="col"
+                        class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                      >
+                        {{ $t('workLogs.source') }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-neutral-200">
+                    <tr v-for="(log, logIndex) in day.logs" :key="logIndex">
+                      <td
+                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                      >
+                        {{ log.time ? formatTime(log.time) : "-" }}
+                      </td>
+                      <td
+                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                      >
+                        {{ log.type || "-" }}
+                      </td>
+                      <td
+                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                      >
+                        {{ log.category || "-" }}
+                      </td>
+                      <td
+                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                      >
+                        {{ log.notes || "-" }}
+                      </td>
+                      <td
+                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                      >
+                        <SourceBadge :source="log.source" size="sm" />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Mobile cards -->
+              <div class="md:hidden space-y-2">
+                <div
+                  v-for="(log, logIndex) in day.logs"
+                  :key="logIndex"
+                  class="bg-neutral-50 rounded-lg p-3"
+                >
+                  <div class="flex justify-between items-start mb-2">
+                    <span class="font-medium text-neutral-800">{{ log.time ? formatTime(log.time) : "-" }}</span>
+                    <SourceBadge :source="log.source" size="sm" />
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span class="text-neutral-500">{{ $t('workLogs.type') }}:</span>
+                      <span class="ml-1 text-neutral-700">{{ log.type || "-" }}</span>
+                    </div>
+                    <div>
+                      <span class="text-neutral-500">{{ $t('workLogs.category') }}:</span>
+                      <span class="ml-1 text-neutral-700">{{ log.category || "-" }}</span>
+                    </div>
+                  </div>
+                  <div v-if="log.notes" class="mt-2 text-sm text-neutral-600">
+                    {{ log.notes }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -577,137 +610,199 @@ onMounted(async () => {
         <!-- Weekly view -->
         <div
           v-else-if="activeTab === 'weekly' && activeReport.days"
-          class="overflow-x-auto"
         >
-          <table class="min-w-full divide-y divide-neutral-200">
-            <thead class="bg-neutral-50">
-              <tr>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+          <!-- Desktop table -->
+          <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-neutral-200">
+              <thead class="bg-neutral-50">
+                <tr>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.day') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.checkIn') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.checkOut') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.duration') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-neutral-200">
+                <tr
+                  v-for="(day, index) in activeReport.days"
+                  :key="index"
+                  :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
                 >
-                  {{ $t('workLogs.day') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.checkIn') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.checkOut') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.duration') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-neutral-200">
-              <tr
-                v-for="(day, index) in activeReport.days"
-                :key="index"
-                :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
-              >
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
-                >
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
+                  >
+                    {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                  >
+                    {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                  >
+                    {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                    :class="
+                      day.duration ? 'text-primary-600' : 'text-neutral-500'
+                    "
+                  >
+                    {{ day.duration || "0:00" }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="md:hidden divide-y divide-neutral-200">
+            <div
+              v-for="(day, index) in activeReport.days"
+              :key="index"
+              class="p-4"
+              :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
+            >
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-medium text-neutral-800">
                   {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                >
-                  {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                >
-                  {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm font-medium"
-                  :class="
-                    day.duration ? 'text-primary-600' : 'text-neutral-500'
-                  "
+                </span>
+                <span
+                  class="font-medium"
+                  :class="day.duration ? 'text-primary-600' : 'text-neutral-500'"
                 >
                   {{ day.duration || "0:00" }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </div>
+              <div v-if="hasWorkLogs(day)" class="flex justify-between text-sm text-neutral-600">
+                <span>{{ $t('workLogs.checkIn') }}: {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}</span>
+                <span>{{ $t('workLogs.checkOut') }}: {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}</span>
+              </div>
+              <div v-else class="text-sm text-neutral-500 italic">
+                {{ $t('workLogs.noLogsForDay') }}
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Monthly view -->
         <div
           v-else-if="activeTab === 'monthly' && activeReport.days"
-          class="overflow-x-auto"
         >
-          <table class="min-w-full divide-y divide-neutral-200">
-            <thead class="bg-neutral-50">
-              <tr>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+          <!-- Desktop table -->
+          <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-neutral-200">
+              <thead class="bg-neutral-50">
+                <tr>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.date') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.checkIn') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.checkOut') }}
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
+                  >
+                    {{ $t('workLogs.duration') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-neutral-200">
+                <tr
+                  v-for="(day, index) in activeReport.days"
+                  :key="index"
+                  :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
                 >
-                  {{ $t('workLogs.date') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.checkIn') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.checkOut') }}
-                </th>
-                <th
-                  scope="col"
-                  class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
-                >
-                  {{ $t('workLogs.duration') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-neutral-200">
-              <tr
-                v-for="(day, index) in activeReport.days"
-                :key="index"
-                :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
-              >
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
-                >
-                  {{ format(parseISO(day.date), "EEE, MMM d, yyyy", { locale: dateLocale }) }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                >
-                  {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
-                >
-                  {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
-                </td>
-                <td
-                  class="px-6 py-4 whitespace-nowrap text-sm font-medium"
-                  :class="
-                    day.duration ? 'text-primary-600' : 'text-neutral-500'
-                  "
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
+                  >
+                    {{ format(parseISO(day.date), "EEE, MMM d, yyyy", { locale: dateLocale }) }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                  >
+                    {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                  >
+                    {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}
+                  </td>
+                  <td
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                    :class="
+                      day.duration ? 'text-primary-600' : 'text-neutral-500'
+                    "
+                  >
+                    {{ day.duration || "0:00" }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="md:hidden divide-y divide-neutral-200">
+            <div
+              v-for="(day, index) in activeReport.days"
+              :key="index"
+              class="p-4"
+              :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
+            >
+              <div class="flex justify-between items-center mb-2">
+                <span class="font-medium text-neutral-800">
+                  {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
+                </span>
+                <span
+                  class="font-medium"
+                  :class="day.duration ? 'text-primary-600' : 'text-neutral-500'"
                 >
                   {{ day.duration || "0:00" }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </span>
+              </div>
+              <div v-if="hasWorkLogs(day)" class="flex justify-between text-sm text-neutral-600">
+                <span>{{ $t('workLogs.checkIn') }}: {{ day.checkIn ? formatTime(day.checkIn.time) : "-" }}</span>
+                <span>{{ $t('workLogs.checkOut') }}: {{ day.checkOut ? formatTime(day.checkOut.time) : "-" }}</span>
+              </div>
+              <div v-else class="text-sm text-neutral-500 italic">
+                {{ $t('workLogs.noLogsForDay') }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
