@@ -34,7 +34,7 @@ const canEdit = computed(() => originalStatus.value === "pending");
 
 // Get employee's remaining vacation days
 const remainingVacationDays = computed(() => {
-  return authStore.user?.employeeRecords?.[0]?.remaining_vacation_days ?? 0;
+  return authStore.user?.employeeRecords?.[0]?.remainingVacationDays ?? 0;
 });
 
 // Get selected absence type details

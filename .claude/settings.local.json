@@ -28,7 +28,9 @@
       "Bash(ls:*)",
       "Bash(npx vite build)",
       "Bash(npx vue-tsc:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(cmd.exe /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")",
+      "Bash(powershell.exe -NoProfile -Command \"Set-Location D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build 2>&1\")"
     ]
   }
 }

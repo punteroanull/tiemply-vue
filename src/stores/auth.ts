@@ -39,15 +39,15 @@ interface Department {
 interface Employee {
   id: string;
   uuid: string;
-  company_id: string;
-  department_id?: string;
-  user_id: string;
-  contract_start_time?: string; // HH:mm format
-  contract_end_time?: string; // HH:mm format
-  remaining_vacation_days: number;
+  companyId: string;
+  departmentId?: string;
+  userId: string;
+  contractStartTime?: string; // HH:mm format
+  contractEndTime?: string; // HH:mm format
+  remainingVacationDays: number;
   active: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
   // Relations
   company?: Company;
   department?: Department;
@@ -147,19 +147,19 @@ export const useAuthStore = defineStore("auth", () => {
   );
 
   const remainingVacationDays = computed(
-    () => currentEmployee.value?.remaining_vacation_days || 0
+    () => currentEmployee.value?.remainingVacationDays || 0
   );
 
   const workingHours = computed(() => {
     if (
-      !currentEmployee.value?.contract_start_time ||
-      !currentEmployee.value?.contract_end_time
+      !currentEmployee.value?.contractStartTime ||
+      !currentEmployee.value?.contractEndTime
     ) {
       return null;
     }
     return {
-      start: currentEmployee.value.contract_start_time,
-      end: currentEmployee.value.contract_end_time,
+      start: currentEmployee.value.contractStartTime,
+      end: currentEmployee.value.contractEndTime,
     };
   });
 
@@ -351,14 +351,14 @@ export const useAuthStore = defineStore("auth", () => {
   function belongsToCompany(companyId: string): boolean {
     if (!user.value?.employeeRecords) return false;
     return user.value.employeeRecords.some(
-      (emp) => emp.company_id === companyId
+      (emp) => emp.companyId === companyId
     );
   }
 
   function getEmployeeForCompany(companyId: string): Employee | null {
     if (!user.value?.employeeRecords) return null;
     return (
-      user.value.employeeRecords.find((emp) => emp.company_id === companyId) ||
+      user.value.employeeRecords.find((emp) => emp.companyId === companyId) ||
       null
     );
   }

@@ -89,18 +89,18 @@ export interface Department {
 export interface Employee {
   id: string;
   uuid: string;
-  company_id: string;
-  department_id?: string;
-  user_id: string;
-  contract_start_time?: string;
-  contract_end_time?: string;
-  remaining_vacation_days: number;
+  companyId: string;
+  departmentId?: string;
+  userId: string;
+  contractStartTime?: string;
+  contractEndTime?: string;
+  remainingVacationDays: number;
   active: boolean;
   company?: Company;
   department?: Department;
   user?: User;
-  created_at?: string;
-  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface WorkLog {

@@ -76,22 +76,22 @@ onMounted(async () => {
         </h2>
 
         <div class="space-y-4">
-          <div v-if="employee.contract_start_time">
+          <div v-if="employee.contractStartTime">
             <label class="label">{{ $t('profile.workScheduleStart') }}</label>
             <div class="text-neutral-800">
-              {{ employee.contract_start_time }}
+              {{ employee.contractStartTime }}
             </div>
           </div>
 
-          <div v-if="employee.contract_end_time">
+          <div v-if="employee.contractEndTime">
             <label class="label">{{ $t('profile.workScheduleEnd') }}</label>
-            <div class="text-neutral-800">{{ employee.contract_end_time }}</div>
+            <div class="text-neutral-800">{{ employee.contractEndTime }}</div>
           </div>
 
           <div>
             <label class="label">{{ $t('profile.remainingVacation') }}</label>
             <div class="text-neutral-800 font-medium">
-              {{ employee.remaining_vacation_days || 0 }} {{ $t('profile.days') }}
+              {{ employee.remainingVacationDays || 0 }} {{ $t('profile.days') }}
             </div>
           </div>
 
