@@ -137,9 +137,20 @@ watch(
 async function handleSubmit() {
   if (!isValid.value) return;
 
+  // Get overall date range from all periods
+  const allStartDates = periods.value.map(p => p.startDate).filter(Boolean);
+  const allEndDates = periods.value.map(p => p.endDate).filter(Boolean);
+  const overallStartDate = allStartDates.length > 0 ? allStartDates.sort()[0] : null;
+  const overallEndDate = allEndDates.length > 0 ? allEndDates.sort().reverse()[0] : null;
+
   const requestData = {
     employee_id: authStore.user?.employeeRecords?.[0]?.id,
     absence_type_id: selectedAbsenceType.value,
+    start_date: overallStartDate,
+    end_date: overallEndDate,
+    is_partial: periods.value.length === 1 && periods.value[0].isPartial,
+    start_time: periods.value.length === 1 && periods.value[0].isPartial ? periods.value[0].startTime : null,
+    end_time: periods.value.length === 1 && periods.value[0].isPartial ? periods.value[0].endTime : null,
     periods: periods.value.map(period => ({
       start_date: period.startDate,
       end_date: period.endDate,
