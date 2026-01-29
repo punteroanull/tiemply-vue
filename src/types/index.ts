@@ -71,6 +71,7 @@ export interface Company {
   office_longitude?: number;
   office_address?: string;
   logo_path?: string;
+  vacation_request_advance_days?: number;
   created_at?: string;
   updated_at?: string;
 }

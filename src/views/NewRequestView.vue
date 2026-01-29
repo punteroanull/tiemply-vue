@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-import { format } from "date-fns";
+import { format, subDays } from "date-fns";
 
 const router = useRouter();
 const absencesStore = useAbsencesStore();
@@ -35,8 +35,17 @@ const notes = ref("");
 const isSubmitting = computed(() => absencesStore.submitting);
 const isLoading = computed(() => absencesStore.loading);
 
-// Get minimum date (today)
-const minDate = computed(() => format(new Date(), "yyyy-MM-dd"));
+// Get minimum date (today minus advance days configured in company)
+const advanceDays = computed(() => {
+  return authStore.currentCompany?.vacationRequestAdvanceDays ?? 0;
+});
+
+const minDate = computed(() => {
+  const baseDate = advanceDays.value > 0
+    ? subDays(new Date(), advanceDays.value)
+    : new Date();
+  return format(baseDate, "yyyy-MM-dd");
+});
 
 // Get employee's remaining vacation days
 const remainingVacationDays = computed(() => {

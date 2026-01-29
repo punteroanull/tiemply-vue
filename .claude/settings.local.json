@@ -30,7 +30,12 @@
       "Bash(npx vue-tsc:*)",
       "Bash(tree:*)",
       "Bash(cmd.exe /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npm run build\")",
-      "Bash(powershell.exe -NoProfile -Command \"Set-Location D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build 2>&1\")"
+      "Bash(powershell.exe -NoProfile -Command \"Set-Location D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; npm run build 2>&1\")",
+      "Bash(powershell -Command \"cd ''D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue'' ; npm run build\")",
+      "Bash(cmd /c \"cd /d D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue && npx vue-tsc --noEmit 2>&1\")",
+      "Bash(cmd /c \"npm run build\")",
+      "Bash(cmd /c \"npm run build 2>&1\")",
+      "Bash(powershell -Command \"cd D:\\\\Proyectos\\\\tiemply\\\\tiemply-vue; & ''C:\\\\Program Files\\\\nodejs\\\\npm.cmd'' run build 2>&1\")"
     ]
   }
 }

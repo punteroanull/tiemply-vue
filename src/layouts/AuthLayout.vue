@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import { useRoute } from "vue-router";
-
-const route = useRoute();
-const isLoginPage = route.path === "/login";
 </script>
 
 <template>
@@ -17,27 +13,6 @@ const isLoginPage = route.path === "/login";
 
       <div class="bg-white shadow-subtle rounded-lg p-8">
         <router-view />
-      </div>
-
-      <div class="mt-4 text-center text-sm text-neutral-500">
-        <template v-if="isLoginPage">
-          Don't have an account?
-          <router-link
-            to="/register"
-            class="text-primary-600 hover:text-primary-700"
-          >
-            Register
-          </router-link>
-        </template>
-        <template v-else>
-          Already have an account?
-          <router-link
-            to="/login"
-            class="text-primary-600 hover:text-primary-700"
-          >
-            Login
-          </router-link>
-        </template>
       </div>
     </div>
   </div>
