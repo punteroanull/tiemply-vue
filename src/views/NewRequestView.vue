@@ -183,7 +183,10 @@ function goBack() {
 }
 
 onMounted(async () => {
-  await absencesStore.fetchAbsenceTypes();
+  await Promise.all([
+    authStore.fetchCurrentUser(),
+    absencesStore.fetchAbsenceTypes(),
+  ]);
 });
 </script>
 
