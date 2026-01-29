@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
 import { format, subDays } from "date-fns";
+import api from "../services/api";
 
 const router = useRouter();
 const absencesStore = useAbsencesStore();
@@ -30,6 +31,7 @@ const periods = ref<Period[]>([
   }
 ]);
 const notes = ref("");
+const companyAdvanceDays = ref<number>(0);
 
 // UI state
 const isSubmitting = computed(() => absencesStore.submitting);
@@ -38,7 +40,7 @@ const isLoading = computed(() => absencesStore.loading);
 // Get minimum date (today minus advance days configured in company)
 // The backend sends a negative value (e.g. -5) to allow selecting dates N days in the past
 const advanceDays = computed(() => {
-  return Math.abs(authStore.currentCompany?.vacationRequestAdvanceDays ?? 0);
+  return Math.abs(companyAdvanceDays.value);
 });
 
 const minDate = computed(() => {
@@ -183,9 +185,20 @@ function goBack() {
 }
 
 onMounted(async () => {
+  const employeeId = authStore.user?.employeeRecords?.[0]?.id;
+
   await Promise.all([
-    authStore.fetchCurrentUser(),
     absencesStore.fetchAbsenceTypes(),
+    (async () => {
+      if (!employeeId) return;
+      try {
+        const response = await api.get(`/employees/${employeeId}/company-settings`);
+        const data = response.data?.data ?? response.data;
+        companyAdvanceDays.value = data?.vacationRequestAdvanceDays ?? 0;
+      } catch (e) {
+        console.warn('Could not fetch company settings:', e);
+      }
+    })(),
   ]);
 });
 </script>
