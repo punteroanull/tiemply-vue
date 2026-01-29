@@ -37,7 +37,7 @@ const isLoading = computed(() => absencesStore.loading);
 
 // Get minimum date (today minus advance days configured in company)
 const advanceDays = computed(() => {
-  return authStore.currentCompany?.vacationRequestAdvanceDays ?? 0;
+  return authStore.currentCompany?.vacation_request_advance_days ?? 0;
 });
 
 const minDate = computed(() => {
