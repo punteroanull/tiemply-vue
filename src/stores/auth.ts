@@ -24,7 +24,7 @@ interface Company {
   phone?: string;
   vacation_type: "business_days" | "calendar_days";
   max_vacation_days: number;
-  vacation_request_advance_days?: number;
+  vacationRequestAdvanceDays?: number;
   logoPath?: string;
 }
 

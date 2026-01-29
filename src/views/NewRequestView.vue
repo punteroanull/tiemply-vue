@@ -36,8 +36,9 @@ const isSubmitting = computed(() => absencesStore.submitting);
 const isLoading = computed(() => absencesStore.loading);
 
 // Get minimum date (today minus advance days configured in company)
+// The backend sends a negative value (e.g. -5) to allow selecting dates N days in the past
 const advanceDays = computed(() => {
-  return authStore.currentCompany?.vacation_request_advance_days ?? 0;
+  return Math.abs(authStore.currentCompany?.vacationRequestAdvanceDays ?? 0);
 });
 
 const minDate = computed(() => {
