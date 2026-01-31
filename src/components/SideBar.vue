@@ -48,7 +48,7 @@ const managerItems = computed(() => {
 
 // Department navigation - only show if user has a department
 const hasDepartment = computed(() => !!authStore.currentDepartmentId);
-const canManageDepartment = computed(() => departmentsStore.canManageDepartment);
+const canManageDepartment = computed(() => departmentsStore.canManageDepartment || authStore.isSupervisor);
 
 const departmentItems = computed(() => {
   const items = [

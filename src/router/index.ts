@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useDepartmentsStore } from '../stores/departments'
 
 // Views
 import DashboardView from '../views/DashboardView.vue'
@@ -154,6 +155,7 @@ const router = createRouter({
 router.beforeEach((to, _from, next) => {
   console.log("Router beforeEach - navigating to:", to.name, to.path)
   const authStore = useAuthStore()
+  const departmentsStore = useDepartmentsStore()
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     console.log("Router - redirecting to login (requiresAuth)")
@@ -164,7 +166,7 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.requiresManager && !authStore.isManager && !authStore.isAdmin) {
     console.log("Router - redirecting to dashboard (requiresManager)")
     next({ name: 'dashboard' })
-  } else if (to.meta.requiresSupervisor && !authStore.isSupervisor && !authStore.isAdmin) {
+  } else if (to.meta.requiresSupervisor && !authStore.isSupervisor && !authStore.isAdmin && !departmentsStore.isSupervisor && !authStore.isManager) {
     console.log("Router - redirecting to dashboard (requiresSupervisor)")
     next({ name: 'dashboard' })
   } else {
