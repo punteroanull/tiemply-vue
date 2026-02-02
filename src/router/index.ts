@@ -163,7 +163,7 @@ router.beforeEach((to, _from, next) => {
   } else if (to.meta.guest && authStore.isAuthenticated) {
     console.log("Router - redirecting to dashboard (guest but authenticated)")
     next({ name: 'dashboard' })
-  } else if (to.meta.requiresManager && !authStore.isManager && !authStore.isAdmin) {
+  } else if (to.meta.requiresManager && !authStore.isManager && !authStore.isAdmin && !authStore.isSupervisor && !departmentsStore.isSupervisor) {
     console.log("Router - redirecting to dashboard (requiresManager)")
     next({ name: 'dashboard' })
   } else if (to.meta.requiresSupervisor && !authStore.isSupervisor && !authStore.isAdmin && !departmentsStore.isSupervisor && !authStore.isManager) {

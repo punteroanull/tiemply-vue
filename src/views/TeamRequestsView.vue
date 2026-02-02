@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
+import { useDepartmentsStore } from "../stores/departments";
 import { format, parseISO } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 import { useToast } from "vue-toastification";
@@ -13,6 +14,7 @@ const { t, locale } = useI18n();
 const router = useRouter();
 const absencesStore = useAbsencesStore();
 const authStore = useAuthStore();
+const departmentsStore = useDepartmentsStore();
 const toast = useToast();
 
 const isLoading = computed(() => absencesStore.loading);
@@ -240,7 +242,7 @@ function hasPendingPeriods(request: any): boolean {
 
 onMounted(async () => {
   // Check if user is manager or admin
-  if (!authStore.isManager && !authStore.isAdmin) {
+  if (!authStore.isManager && !authStore.isAdmin && !authStore.isSupervisor && !departmentsStore.isSupervisor) {
     toast.error(t("messages.loginFailed"));
     router.push("/dashboard");
     return;

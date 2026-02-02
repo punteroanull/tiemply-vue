@@ -36,7 +36,9 @@ const navigationItems = computed(() => [
 ]);
 
 // Manager/Admin navigation - only show if user is manager or admin
-const isManagerOrAdmin = computed(() => authStore.isManager || authStore.isAdmin);
+const isManagerOrAdmin = computed(() =>
+  authStore.isManager || authStore.isAdmin || authStore.isSupervisor || departmentsStore.isSupervisor
+);
 
 const managerItems = computed(() => {
   if (!isManagerOrAdmin.value) return [];
