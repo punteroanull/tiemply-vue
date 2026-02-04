@@ -307,7 +307,9 @@ export default {
     locationError: 'Location error',
     locationPending: 'Location pending',
     gettingLocation: 'Getting location...',
-    offlineActionsWillSync: 'Offline - actions will sync later'
+    offlineActionsWillSync: 'Offline - actions will sync later',
+    locationRequiredForCheckout: 'Location is required for check-out but could not be obtained.',
+    checkoutNotRecorded: 'Check-out may not have been recorded. Please verify in your work logs.'
   },
 
   // Common

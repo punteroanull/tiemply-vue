@@ -474,10 +474,12 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   async function checkOut(category: 'shift_end' | 'break_start' | 'offsite_start' = 'shift_end') {
     if (!authStore.user?.id) return false;
 
+    const employeeId = authStore.user.employeeRecords?.[0]?.id;
+    console.log('[CheckOut] Starting checkout', { category, userId: authStore.user?.id, employeeId });
+
     checkingOut.value = true;
 
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
       if (!employeeId) {
         throw new Error("Employee record not found");
       }
@@ -485,10 +487,14 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       // Obtener ubicación si está habilitada
       let location: GeolocationData | null = null;
       if (isGeolocationEnabled.value) {
+        console.log('[CheckOut] Geolocation enabled, attempting to get location...');
         location = await getCurrentLocation();
+        console.log('[CheckOut] Geolocation result:', location ? { lat: location.latitude, lng: location.longitude, accuracy: location.accuracy } : 'null');
 
-        // Si la geolocalización es requerida y no se pudo obtener, abortar
+        // Si la geolocalización es requerida y no se pudo obtener, abortar con mensaje de error
         if (isGeolocationRequired.value && !location) {
+          console.error('[CheckOut] ABORTED: Geolocation required but not available');
+          toast.error('Location is required for check-out but could not be obtained.');
           return false;
         }
       }
@@ -511,7 +517,10 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         });
       }
 
+      console.log('[CheckOut] Sending request to server:', checkOutData);
       const response = await api.post("/worklogs/check-out", checkOutData);
+      console.log('[CheckOut] Server response (raw):', response);
+      console.log('[CheckOut] Server response (data):', response.data);
 
       // Extract data from response
       let responseData: any = null;
@@ -538,7 +547,19 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         toast.info(responseData.overtimeRegistered.message);
       }
 
+      // Guardar estado previo para validación
+      const wasCheckedIn = status.value?.checkedIn;
+      console.log('[CheckOut] State before fetchStatus:', { checkedIn: wasCheckedIn, category: status.value?.currentCategory });
+
       await fetchStatus();
+
+      console.log('[CheckOut] State after fetchStatus:', { checkedIn: status.value?.checkedIn, category: status.value?.currentCategory });
+
+      // Validar consistencia: si era shift_end, el usuario debería estar deslogueado
+      if (category === 'shift_end' && status.value?.checkedIn === true) {
+        console.error('[CheckOut] INCONSISTENCY DETECTED: Server returned OK but status still shows checked-in');
+        toast.warning('Check-out may not have been recorded. Please verify in your work logs.');
+      }
 
       let successMessage = "You have successfully checked out";
       if (location) {

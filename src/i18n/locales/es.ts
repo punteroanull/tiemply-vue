@@ -307,7 +307,9 @@ export default {
     locationError: 'Error de ubicación',
     locationPending: 'Ubicación pendiente',
     gettingLocation: 'Obteniendo ubicación...',
-    offlineActionsWillSync: 'Sin conexion - las acciónes se sincronizaran despues'
+    offlineActionsWillSync: 'Sin conexion - las acciónes se sincronizaran despues',
+    locationRequiredForCheckout: 'Se requiere ubicación para hacer check-out pero no se pudo obtener.',
+    checkoutNotRecorded: 'El check-out puede no haberse registrado. Por favor verifica en tu historial de horas.'
   },
 
   // Comunes
