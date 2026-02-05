@@ -20,6 +20,14 @@ const isLoading = computed(() =>
   workStatusStore.checkingIn || workStatusStore.checkingOut || workStatusStore.gettingLocation
 );
 
+// Deshabilitar botón cuando geolocalización es requerida pero hay error
+const isButtonDisabled = computed(() => {
+  if (workStatusStore.isGeolocationRequired && workStatusStore.locationError) {
+    return true;
+  }
+  return isLoading.value;
+});
+
 const translatedStateLabel = computed(() => {
   switch (workStatusStore.currentState) {
     case 'working': return t('workStatus.working');
@@ -109,7 +117,7 @@ const buttonColorClass = computed(() => {
 });
 
 function toggleMenu() {
-  if (!isLoading.value) {
+  if (!isButtonDisabled.value) {
     isMenuOpen.value = !isMenuOpen.value;
   }
 }
@@ -194,12 +202,12 @@ onUnmounted(() => {
     <!-- Main Button -->
     <button
       @click="toggleMenu"
-      :disabled="isLoading"
+      :disabled="isButtonDisabled"
       :class="[
         'flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-white font-medium',
         'transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2',
         buttonColorClass,
-        isLoading ? 'opacity-75 cursor-wait' : 'hover:shadow-xl hover:scale-105'
+        isButtonDisabled ? 'opacity-75 cursor-not-allowed' : 'hover:shadow-xl hover:scale-105'
       ]"
     >
       <!-- Loading Spinner -->

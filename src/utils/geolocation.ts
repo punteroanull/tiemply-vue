@@ -28,8 +28,8 @@ export function getCurrentPosition(): Promise<GeolocationData> {
 
     const options: PositionOptions = {
       enableHighAccuracy: true,
-      timeout: 15000, // 15 segundos
-      maximumAge: 300000 // 5 minutos
+      timeout: 30000, // 30 segundos - GPS en interiores o señal débil necesita más tiempo
+      maximumAge: 60000 // 1 minuto máximo para posiciones cached
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -71,21 +71,31 @@ export function getCurrentPosition(): Promise<GeolocationData> {
  * Nota: Esto requeriría una API externa como Google Maps o OpenStreetMap
  */
 export async function getAddressFromCoords(lat: number, lng: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
+
   try {
     // Usando Nominatim (OpenStreetMap) - gratuito pero con límites de uso
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+      { signal: controller.signal }
     );
-    
+
     if (!response.ok) {
       throw new Error('Failed to fetch address');
     }
-    
+
     const data = await response.json();
     return data.display_name || null;
   } catch (error) {
-    console.warn('Failed to get address from coordinates:', error);
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.warn('Geocoding request timed out after 5s');
+    } else {
+      console.warn('Failed to get address from coordinates:', error);
+    }
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

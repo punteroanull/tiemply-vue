@@ -559,6 +559,8 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       if (category === 'shift_end' && status.value?.checkedIn === true) {
         console.error('[CheckOut] INCONSISTENCY DETECTED: Server returned OK but status still shows checked-in');
         toast.warning('Check-out may not have been recorded. Please verify in your work logs.');
+        // NO limpiar locationData - mantener datos para posible reintento
+        return false;
       }
 
       let successMessage = "You have successfully checked out";
@@ -570,7 +572,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       stopRefreshInterval();
       stopDurationUpdateInterval();
 
-      // Limpiar datos de ubicación después del check-out
+      // Limpiar datos de ubicación solo si el checkout fue exitoso y consistente
       locationData.value = null;
       locationError.value = null;
 
