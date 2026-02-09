@@ -409,16 +409,24 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       // Añadir datos de ubicación si están disponibles
       if (location) {
-        checkInData.location = JSON.stringify({
+        checkInData.location = {
           latitude: location.latitude,
           longitude: location.longitude,
           accuracy: location.accuracy,
           timestamp: location.timestamp,
           address: location.address,
-        });
+        };
       }
 
       const response = await api.post("/worklogs/check-in", checkInData);
+
+      // Validar que el backend indica éxito
+      if (response.data?.success === false) {
+        const errorMessage = response.data?.message || 'Check-in failed on server';
+        console.error('[CheckIn] Server returned success: false', { message: errorMessage });
+        toast.error(errorMessage);
+        return false;
+      }
 
       // Extract data from response
       let responseData: any = null;
@@ -508,19 +516,27 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       // Añadir datos de ubicación si están disponibles
       if (location) {
-        checkOutData.location = JSON.stringify({
+        checkOutData.location = {
           latitude: location.latitude,
           longitude: location.longitude,
           accuracy: location.accuracy,
           timestamp: location.timestamp,
           address: location.address,
-        });
+        };
       }
 
       console.log('[CheckOut] Sending request to server:', checkOutData);
       const response = await api.post("/worklogs/check-out", checkOutData);
       console.log('[CheckOut] Server response (raw):', response);
       console.log('[CheckOut] Server response (data):', response.data);
+
+      // Validar que el backend indica éxito
+      if (response.data?.success === false) {
+        const errorMessage = response.data?.message || 'Check-out failed on server';
+        console.error('[CheckOut] Server returned success: false', { message: errorMessage });
+        toast.error(errorMessage);
+        return false;
+      }
 
       // Extract data from response
       let responseData: any = null;
