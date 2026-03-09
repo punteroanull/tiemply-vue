@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useWorkStatusStore } from '../stores/workStatus'
 import { useDepartmentsStore } from '../stores/departments'
+import { useHourPoolStore } from '../stores/hourPool'
 import NavBar from '../components/NavBar.vue'
 import SideBar from '../components/SideBar.vue'
 import CheckInOutButton from '../components/CheckInOutButton.vue'
@@ -11,12 +12,14 @@ import CheckInOutButton from '../components/CheckInOutButton.vue'
 const authStore = useAuthStore()
 const workStatusStore = useWorkStatusStore()
 const departmentsStore = useDepartmentsStore()
+const hourPoolStore = useHourPoolStore()
 const router = useRouter()
 
 const isSidebarOpen = ref(false)
 
 onMounted(() => {
   workStatusStore.initialize()
+  hourPoolStore.fetchCompanySettings()
   // Fetch department data so the sidebar can determine if the user is a supervisor
   if (authStore.currentDepartmentId) {
     departmentsStore.fetchDepartment()

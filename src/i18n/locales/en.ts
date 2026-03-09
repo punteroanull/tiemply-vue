@@ -533,6 +533,8 @@ export default {
     description: 'Description',
     createdBy: 'Created by',
     actions: 'Actions',
+    notAvailable: 'Hour Pool not available',
+    notAvailableDescription: 'The hour pool is not available for employees in this company.',
     noEntries: 'No entries',
     noEntriesDescription: 'You have no hour pool entries yet.',
     showing: 'Showing',

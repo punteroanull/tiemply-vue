@@ -100,12 +100,24 @@ watch([selectedType, selectedSourceType], () => {
 });
 
 onMounted(async () => {
+  if (!hourPoolStore.canViewHourPool) return;
   await Promise.all([loadBalance(), loadEntries()]);
 });
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Access denied -->
+  <div v-if="!hourPoolStore.canViewHourPool" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-lg border border-neutral-200 p-8 text-center">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto text-neutral-400">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+      <h3 class="mt-4 text-lg font-medium text-neutral-900">{{ t("hourPool.notAvailable") }}</h3>
+      <p class="mt-2 text-neutral-500">{{ t("hourPool.notAvailableDescription") }}</p>
+    </div>
+  </div>
+
+  <div v-else class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Header -->
     <div class="mb-6 md:flex md:items-center md:justify-between">
       <div>

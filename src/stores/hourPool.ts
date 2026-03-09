@@ -23,6 +23,7 @@ export const useHourPoolStore = defineStore("hourPool", () => {
   const loading = ref(false);
   const loadingEntries = ref(false);
   const loadingSummary = ref(false);
+  const hourPoolVisibleToEmployees = ref(false);
 
   // Helper function to extract data from API response
   function extractData<T>(response: any): T {
@@ -33,6 +34,9 @@ export const useHourPoolStore = defineStore("hourPool", () => {
   }
 
   // Computed
+  const canViewHourPool = computed(() =>
+    authStore.isAdmin || authStore.isManager || authStore.isSupervisor || hourPoolVisibleToEmployees.value
+  );
   const isCompanyOwes = computed(() => balance.value?.confirmed.status === "company_owes");
   const isEmployeeOwes = computed(() => balance.value?.confirmed.status === "employee_owes");
   const isEven = computed(() => balance.value?.confirmed.status === "even");
@@ -43,9 +47,28 @@ export const useHourPoolStore = defineStore("hourPool", () => {
   const totalEntries = computed(() => entries.value?.total || 0);
 
   // Actions
+  async function fetchCompanySettings(): Promise<void> {
+    try {
+      const employeeId = authStore.user?.employeeRecords?.[0]?.id;
+      if (!employeeId) return;
+
+      const response = await api.get(`/employees/${employeeId}/company-settings`);
+      let data: any;
+      if (response.data && typeof response.data === "object" && "data" in response.data) {
+        data = response.data.data;
+      } else {
+        data = response.data;
+      }
+      hourPoolVisibleToEmployees.value = !!data?.hourPoolVisibleToEmployees;
+    } catch (error) {
+      console.warn("Could not fetch hour pool company settings:", error);
+      hourPoolVisibleToEmployees.value = false;
+    }
+  }
+
   async function fetchBalance(year?: number): Promise<void> {
     const employeeId = authStore.user?.employeeRecords?.[0]?.id;
-    if (!employeeId) return;
+    if (!employeeId || !canViewHourPool.value) return;
 
     loading.value = true;
     try {
@@ -73,7 +96,7 @@ export const useHourPoolStore = defineStore("hourPool", () => {
     page?: number;
   }): Promise<void> {
     const employeeId = authStore.user?.employeeRecords?.[0]?.id;
-    if (!employeeId) return;
+    if (!employeeId || !canViewHourPool.value) return;
 
     loadingEntries.value = true;
     try {
@@ -160,8 +183,10 @@ export const useHourPoolStore = defineStore("hourPool", () => {
     loading,
     loadingEntries,
     loadingSummary,
+    hourPoolVisibleToEmployees,
 
     // Computed
+    canViewHourPool,
     isCompanyOwes,
     isEmployeeOwes,
     isEven,
@@ -171,6 +196,7 @@ export const useHourPoolStore = defineStore("hourPool", () => {
     totalEntries,
 
     // Actions
+    fetchCompanySettings,
     fetchBalance,
     fetchEntries,
     fetchCompanySummary,

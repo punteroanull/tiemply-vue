@@ -533,6 +533,8 @@ export default {
     description: 'Descripción',
     createdBy: 'Creado por',
     actions: 'Acciones',
+    notAvailable: 'Pool de Horas no disponible',
+    notAvailableDescription: 'El pool de horas no está disponible para empleados en esta empresa.',
     noEntries: 'Sin movimientos',
     noEntriesDescription: 'Aún no tienes movimientos en tu pool de horas.',
     showing: 'Mostrando',

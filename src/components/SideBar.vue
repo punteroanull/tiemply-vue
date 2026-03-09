@@ -4,10 +4,12 @@ import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useAuthStore } from "../stores/auth";
 import { useDepartmentsStore } from "../stores/departments";
+import { useHourPoolStore } from "../stores/hourPool";
 
 const { t } = useI18n();
 const authStore = useAuthStore();
 const departmentsStore = useDepartmentsStore();
+const hourPoolStore = useHourPoolStore();
 
 const props = defineProps({
   isOpen: {
@@ -24,17 +26,27 @@ const emit = defineEmits(["close"]);
 
 const route = useRoute();
 
-const navigationItems = computed(() => [
-  { name: t("nav.dashboard"), path: "/", icon: "home" },
-  { name: t("nav.workLogs"), path: "/work-logs", icon: "clock" },
-  { name: t("nav.schedule"), path: "/schedule", icon: "schedule" },
-  { name: t("nav.overtime"), path: "/overtime", icon: "overtime" },
-  { name: t("nav.hourPool"), path: "/hour-pool", icon: "hourPool" },
-  { name: t("nav.incidents"), path: "/incidents", icon: "alert" },
-  { name: t("nav.absences"), path: "/absences", icon: "calendar" },
-  { name: t("nav.requests"), path: "/requests", icon: "document" },
-  { name: t("nav.profile"), path: "/profile", icon: "user" },
-]);
+const navigationItems = computed(() => {
+  const items = [
+    { name: t("nav.dashboard"), path: "/", icon: "home" },
+    { name: t("nav.workLogs"), path: "/work-logs", icon: "clock" },
+    { name: t("nav.schedule"), path: "/schedule", icon: "schedule" },
+    { name: t("nav.overtime"), path: "/overtime", icon: "overtime" },
+  ];
+
+  if (hourPoolStore.canViewHourPool) {
+    items.push({ name: t("nav.hourPool"), path: "/hour-pool", icon: "hourPool" });
+  }
+
+  items.push(
+    { name: t("nav.incidents"), path: "/incidents", icon: "alert" },
+    { name: t("nav.absences"), path: "/absences", icon: "calendar" },
+    { name: t("nav.requests"), path: "/requests", icon: "document" },
+    { name: t("nav.profile"), path: "/profile", icon: "user" },
+  );
+
+  return items;
+});
 
 // Manager/Admin navigation - only show if user is manager or admin
 const isManagerOrAdmin = computed(() =>
