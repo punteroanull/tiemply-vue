@@ -17,6 +17,8 @@ import RequestsView from '../views/RequestsView.vue'
 import NewRequestView from '../views/NewRequestView.vue'
 import EditRequestView from '../views/EditRequestView.vue'
 import TeamRequestsView from '../views/TeamRequestsView.vue'
+import HourPoolView from '../views/HourPoolView.vue'
+import HourPoolSummaryView from '../views/HourPoolSummaryView.vue'
 import NotFoundView from '../views/NotFoundView.vue'
 
 // Department Views
@@ -106,6 +108,18 @@ const router = createRouter({
       name: 'edit-request',
       component: EditRequestView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/hour-pool',
+      name: 'hour-pool',
+      component: HourPoolView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/hour-pool/summary',
+      name: 'hour-pool-summary',
+      component: HourPoolSummaryView,
+      meta: { requiresAuth: true, requiresManager: true }
     },
     {
       path: '/team-requests',

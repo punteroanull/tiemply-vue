@@ -12,7 +12,8 @@ export default {
     signOut: 'Cerrar sesión',
     yourProfile: 'Tu Perfil',
     language: 'Idioma',
-    employee: 'Empleado'
+    employee: 'Empleado',
+    hourPool: 'Pool de Horas'
   },
 
   // Invitación
@@ -508,6 +509,63 @@ export default {
     overtimeRegistered: 'Horas extra registradas',
     nightShiftIndicator: 'Estás en turno nocturno',
     shiftDateDifferent: 'Dia del turno: {date}'
+  },
+
+  // Pool de Horas
+  hourPool: {
+    title: 'Pool de Horas',
+    subtitle: 'Consulta tu balance de horas y el historial de movimientos',
+    netBalance: 'Balance Neto',
+    credits: 'Créditos',
+    debits: 'Débitos',
+    balance: 'Balance',
+    credit: 'Crédito',
+    debit: 'Débito',
+    pendingOvertime: 'Horas Extra Pendientes',
+    potentialBalance: 'Balance potencial',
+    entries: 'Movimientos',
+    allTypes: 'Todos los tipos',
+    allSources: 'Todos los orígenes',
+    date: 'Fecha',
+    type: 'Tipo',
+    minutes: 'Minutos',
+    source: 'Origen',
+    description: 'Descripción',
+    createdBy: 'Creado por',
+    actions: 'Acciones',
+    noEntries: 'Sin movimientos',
+    noEntriesDescription: 'Aún no tienes movimientos en tu pool de horas.',
+    showing: 'Mostrando',
+    of: 'de',
+    status: {
+      label: 'Estado',
+      company_owes: 'La empresa debe',
+      employee_owes: 'El empleado debe',
+      even: 'En equilibrio'
+    },
+    sourceTypes: {
+      overtime_approved: 'Horas extra aprobadas',
+      late_arrival: 'Llegada tardía',
+      early_departure: 'Salida anticipada',
+      incident_reversal: 'Reversión de incidencia',
+      manual_adjustment: 'Ajuste manual'
+    },
+    companySummary: {
+      title: 'Resumen Pool de Horas',
+      subtitle: 'Vista general del pool de horas de la empresa',
+      employees: 'Empleados',
+      employee: 'Empleado',
+      employeeBreakdown: 'Desglose por Empleado',
+      noEmployees: 'No hay datos de empleados disponibles'
+    },
+    adjustment: {
+      button: 'Ajustar',
+      title: 'Ajuste Manual',
+      descriptionPlaceholder: 'Motivo del ajuste...',
+      minutesRequired: 'Los minutos deben ser al menos 1',
+      descriptionRequired: 'La descripción es obligatoria',
+      success: 'Ajuste creado correctamente'
+    }
   },
 
   // Geolocalización

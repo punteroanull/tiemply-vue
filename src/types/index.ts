@@ -369,3 +369,85 @@ export interface EnhancedCompanySettings extends CompanySettings {
   overtimeApprovalMode?: 'pre_approval' | 'auto_register';
   maxVacationDays?: number;
 }
+
+// ==========================================
+// HOUR POOL TYPES (Pool de Horas)
+// ==========================================
+
+export type PoolStatus = 'company_owes' | 'employee_owes' | 'even';
+export type EntryType = 'credit' | 'debit';
+export type SourceType = 'overtime_approved' | 'late_arrival' | 'early_departure' | 'incident_reversal' | 'manual_adjustment';
+
+export interface ConfirmedBalance {
+  totalCredits: number;
+  totalDebits: number;
+  netBalance: number;
+  formattedCredits: string;
+  formattedDebits: string;
+  formattedBalance: string;
+  status: PoolStatus;
+}
+
+export interface EmployeePoolBalance {
+  confirmed: ConfirmedBalance;
+  pendingOvertimeMinutes: number;
+  formattedPendingOvertime: string;
+  potentialBalance: number;
+  formattedPotentialBalance: string;
+}
+
+export interface HourPoolEntry {
+  id: string;
+  employeeId: string;
+  type: EntryType;
+  minutes: number;
+  sourceType: SourceType;
+  sourceId: string | null;
+  date: string;
+  description: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  creator: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface PaginatedResponse<T> {
+  currentPage: number;
+  data: T[];
+  firstPageUrl: string;
+  from: number;
+  lastPage: number;
+  lastPageUrl: string;
+  nextPageUrl: string | null;
+  path: string;
+  perPage: number;
+  prevPageUrl: string | null;
+  to: number;
+  total: number;
+}
+
+export interface EmployeeSummary {
+  employeeId: string;
+  employeeName: string;
+  totalCredits: number;
+  totalDebits: number;
+  netBalance: number;
+  formattedBalance: string;
+  status: PoolStatus;
+}
+
+export interface CompanyPoolSummary {
+  companyId: string;
+  companyName: string;
+  totalCredits: number;
+  totalDebits: number;
+  netBalance: number;
+  formattedCredits: string;
+  formattedDebits: string;
+  formattedBalance: string;
+  employeesCount: number;
+  employeeSummaries: EmployeeSummary[];
+}

@@ -12,7 +12,8 @@ export default {
     signOut: 'Sign out',
     yourProfile: 'Your Profile',
     language: 'Language',
-    employee: 'Employee'
+    employee: 'Employee',
+    hourPool: 'Hour Pool'
   },
 
   // Invitation
@@ -508,6 +509,63 @@ export default {
     overtimeRegistered: 'Overtime registered',
     nightShiftIndicator: 'You are on night shift',
     shiftDateDifferent: 'Shift date: {date}'
+  },
+
+  // Hour Pool
+  hourPool: {
+    title: 'Hour Pool',
+    subtitle: 'View your hour balance and entry history',
+    netBalance: 'Net Balance',
+    credits: 'Credits',
+    debits: 'Debits',
+    balance: 'Balance',
+    credit: 'Credit',
+    debit: 'Debit',
+    pendingOvertime: 'Pending Overtime',
+    potentialBalance: 'Potential balance',
+    entries: 'Entries',
+    allTypes: 'All types',
+    allSources: 'All sources',
+    date: 'Date',
+    type: 'Type',
+    minutes: 'Minutes',
+    source: 'Source',
+    description: 'Description',
+    createdBy: 'Created by',
+    actions: 'Actions',
+    noEntries: 'No entries',
+    noEntriesDescription: 'You have no hour pool entries yet.',
+    showing: 'Showing',
+    of: 'of',
+    status: {
+      label: 'Status',
+      company_owes: 'Company owes',
+      employee_owes: 'Employee owes',
+      even: 'Even'
+    },
+    sourceTypes: {
+      overtime_approved: 'Approved overtime',
+      late_arrival: 'Late arrival',
+      early_departure: 'Early departure',
+      incident_reversal: 'Incident reversal',
+      manual_adjustment: 'Manual adjustment'
+    },
+    companySummary: {
+      title: 'Hour Pool Summary',
+      subtitle: 'Company-wide hour pool overview',
+      employees: 'Employees',
+      employee: 'Employee',
+      employeeBreakdown: 'Employee Breakdown',
+      noEmployees: 'No employee data available'
+    },
+    adjustment: {
+      button: 'Adjust',
+      title: 'Manual Adjustment',
+      descriptionPlaceholder: 'Reason for adjustment...',
+      minutesRequired: 'Minutes must be at least 1',
+      descriptionRequired: 'Description is required',
+      success: 'Adjustment created successfully'
+    }
   },
 
   // Geolocation
