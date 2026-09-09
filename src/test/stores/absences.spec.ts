@@ -119,4 +119,99 @@ describe('absences Store', () => {
       expect(store.pendingRequests).toEqual(mockPending);
     });
   });
+
+  describe('fetchTeamPendingRequests', () => {
+    it('should fetch team pending requests from /requests/pending', async () => {
+      const mockTeamPending = [
+        { id: 'req-1', status: 'pending', periods: [{ id: 'p-1', status: 'pending' }] },
+        { id: 'req-2', status: 'partial', periods: [{ id: 'p-2', status: 'pending' }] },
+      ];
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: mockTeamPending } });
+
+      const store = useAbsencesStore();
+      await store.fetchTeamPendingRequests();
+
+      expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+      expect(store.teamPendingRequests).toEqual(mockTeamPending);
+      expect(store.loading).toBe(false);
+    });
+
+    it('should leave the list empty when the request fails', async () => {
+      vi.mocked(mockApi.get).mockRejectedValueOnce({ response: { status: 404, data: { message: 'Not found' } } });
+
+      const store = useAbsencesStore();
+      await store.fetchTeamPendingRequests();
+
+      expect(store.teamPendingRequests).toEqual([]);
+      expect(store.loading).toBe(false);
+    });
+  });
+
+  describe('reviewPeriod', () => {
+    it('should approve a period and refetch team pending requests', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      const result = await store.reviewPeriod('period-1', 'approved');
+
+      expect(result).toBe(true);
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/periods/period-1/review', { status: 'approved' });
+      expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+      expect(store.reviewing).toBe(false);
+    });
+
+    it('should send rejection_reason in snake_case when rejecting', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      const result = await store.reviewPeriod('period-1', 'rejected', 'Not enough coverage');
+
+      expect(result).toBe(true);
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/periods/period-1/review', {
+        status: 'rejected',
+        rejection_reason: 'Not enough coverage',
+      });
+    });
+
+    it('should return false when the API rejects the review', async () => {
+      vi.mocked(mockApi.post).mockRejectedValueOnce({ response: { status: 403, data: { message: 'Forbidden' } } });
+
+      const store = useAbsencesStore();
+      const result = await store.reviewPeriod('period-1', 'approved');
+
+      expect(result).toBe(false);
+      expect(mockApi.get).not.toHaveBeenCalled();
+      expect(store.reviewing).toBe(false);
+    });
+  });
+
+  describe('approveAllPeriods / rejectAllPeriods', () => {
+    it('should call the approve-all-periods endpoint and refetch', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      const result = await store.approveAllPeriods('req-1');
+
+      expect(result).toBe(true);
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/req-1/approve-all-periods');
+      expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+    });
+
+    it('should call the reject-all-periods endpoint with rejection_reason', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      const result = await store.rejectAllPeriods('req-1', 'Team is short-staffed');
+
+      expect(result).toBe(true);
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/req-1/reject-all-periods', {
+        rejection_reason: 'Team is short-staffed',
+      });
+      expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+    });
+  });
 });

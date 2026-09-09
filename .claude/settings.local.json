@@ -1,5 +1,8 @@
 {
   "permissions": {
+    "additionalDirectories": [
+      "C:\\Proyectos\\tiemply\\tiemply-api"
+    ],
     "allow": [
       "Bash(cat:*)",
       "Bash(npm install:*)",

@@ -243,8 +243,8 @@ function hasPendingPeriods(request: any): boolean {
 onMounted(async () => {
   // Check if user is manager or admin
   if (!authStore.isManager && !authStore.isAdmin && !authStore.isSupervisor && !departmentsStore.isSupervisor) {
-    toast.error(t("messages.loginFailed"));
-    router.push("/dashboard");
+    toast.error(t("teamRequests.accessDenied"));
+    router.push({ name: "dashboard" });
     return;
   }
 

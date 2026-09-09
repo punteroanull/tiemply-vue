@@ -239,7 +239,8 @@ export default {
     approvePeriod: 'Aprobar período',
     rejectPeriod: 'Rechazar período',
     confirmReject: 'Confirmar Rechazo',
-    periodStatus: 'Estado del período'
+    periodStatus: 'Estado del período',
+    accessDenied: 'No tienes permisos para revisar las solicitudes del equipo'
   },
 
   // Nueva solicitud

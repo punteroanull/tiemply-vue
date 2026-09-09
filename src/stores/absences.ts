@@ -261,9 +261,11 @@ export const useAbsencesStore = defineStore("absences", () => {
     try {
       const response = await api.get('/requests/pending');
       teamPendingRequests.value = extractArrayData<AbsenceRequest>(response);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching team pending requests:", error);
-      toast.error("Failed to fetch team pending requests");
+      toast.error(
+        error.response?.data?.message || "Failed to fetch team pending requests"
+      );
     } finally {
       loading.value = false;
     }

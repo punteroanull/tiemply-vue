@@ -239,7 +239,8 @@ export default {
     approvePeriod: 'Approve period',
     rejectPeriod: 'Reject period',
     confirmReject: 'Confirm Rejection',
-    periodStatus: 'Period status'
+    periodStatus: 'Period status',
+    accessDenied: 'You do not have permission to review team requests'
   },
 
   // New Request

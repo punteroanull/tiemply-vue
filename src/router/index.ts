@@ -166,10 +166,18 @@ const router = createRouter({
   ]
 })
 
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   console.log("Router beforeEach - navigating to:", to.name, to.path)
   const authStore = useAuthStore()
   const departmentsStore = useDepartmentsStore()
+
+  // On a hard reload / deep link the token is restored from localStorage but the
+  // user (and therefore the role flags) is not loaded yet. Load it before
+  // evaluating role-based guards, otherwise every manager/supervisor route
+  // redirects to the dashboard.
+  if (authStore.token && !authStore.user) {
+    await authStore.fetchCurrentUser()
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     console.log("Router - redirecting to login (requiresAuth)")
