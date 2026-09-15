@@ -20,13 +20,26 @@ const isLoading = computed(() =>
   workStatusStore.checkingIn || workStatusStore.checkingOut || workStatusStore.gettingLocation
 );
 
-// Deshabilitar botón cuando geolocalización es requerida pero hay error
-const isButtonDisabled = computed(() => {
-  if (workStatusStore.isGeolocationRequired && workStatusStore.locationError) {
-    return true;
-  }
-  return isLoading.value;
+// El botón solo se bloquea mientras hay una operación en curso. Bloquearlo también ante un error
+// de ubicación dejaba al usuario sin salida: tras un único fallo no podía ni reintentar sin
+// recargar la página, y sin ninguna explicación en pantalla.
+const isButtonDisabled = computed(() => isLoading.value);
+
+// Mensaje traducido del último fallo de ubicación, para mostrarlo de forma persistente.
+const locationErrorMessage = computed(() => {
+  const error = workStatusStore.locationError;
+  if (!error) return null;
+
+  return t(error.messageKey ?? 'geolocation.errors.unknown');
 });
+
+async function retryLocation() {
+  const location = await workStatusStore.retryLocation();
+
+  if (location) {
+    toast.success(t('geolocation.locationAvailable'));
+  }
+}
 
 const translatedStateLabel = computed(() => {
   switch (workStatusStore.currentState) {
@@ -199,6 +212,29 @@ onUnmounted(() => {
 
 <template>
   <div class="relative" v-click-outside="closeMenu">
+    <!-- Aviso persistente de ubicación: un toast se desvanece y deja al usuario sin saber por
+         qué no puede fichar. Aquí el motivo se queda en pantalla, con opción de reintentar. -->
+    <div
+      v-if="locationErrorMessage && workStatusStore.isGeolocationEnabled"
+      class="absolute bottom-full right-0 mb-2 w-72 rounded-lg border border-red-300 bg-red-50 p-3 text-sm shadow-lg dark:border-red-700 dark:bg-red-950"
+      role="alert"
+    >
+      <p class="font-medium text-red-800 dark:text-red-200">
+        {{ t('geolocation.locationError') }}
+      </p>
+      <p class="mt-1 text-red-700 dark:text-red-300">
+        {{ locationErrorMessage }}
+      </p>
+      <button
+        type="button"
+        class="mt-2 rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        :disabled="workStatusStore.gettingLocation"
+        @click="retryLocation"
+      >
+        {{ workStatusStore.gettingLocation ? t('geolocation.gettingLocation') : t('geolocation.retry') }}
+      </button>
+    </div>
+
     <!-- Main Button -->
     <button
       @click="toggleMenu"
@@ -247,8 +283,8 @@ onUnmounted(() => {
         v-if="workStatusStore.isGeolocationEnabled"
         class="absolute -top-1 -right-1"
         :title="
-          workStatusStore.locationError
-            ? `${t('messages.locationError')}: ${workStatusStore.locationError.message}`
+          locationErrorMessage
+            ? `${t('messages.locationError')}: ${locationErrorMessage}`
             : workStatusStore.locationData
             ? t('messages.locationReady')
             : t('messages.locationPending')

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { useWorkStatusStore } from '@/stores/workStatus';
+import { getCurrentPosition, isGeolocationAvailable } from '@/utils/geolocation';
 import { mockApi } from '../mocks/api';
 
 // Mock de vue-toastification
@@ -133,6 +134,50 @@ describe('workStatus Store', () => {
         employee_id: 'employee-123',
         category: 'shift_start',
       }));
+    });
+
+    it('records an error when the browser has no geolocation and the company requires it', async () => {
+      // The bug this covers: getCurrentLocation() returned null without a word, checkIn()
+      // aborted, and the user saw absolutely nothing happen when pressing the button.
+      vi.mocked(isGeolocationAvailable).mockReturnValueOnce(false);
+
+      const store = useWorkStatusStore();
+      store.companySettings = { geolocationEnabled: true, geolocationRequired: true };
+
+      const result = await store.checkIn('shift_start');
+
+      expect(result).toBe(false);
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(store.locationError).not.toBeNull();
+      expect(store.locationError?.messageKey).toBe('geolocation.errors.notSupported');
+    });
+
+    it('records a translatable reason when the position cannot be obtained', async () => {
+      vi.mocked(getCurrentPosition).mockRejectedValueOnce({
+        code: 1,
+        messageKey: 'geolocation.errors.permissionDenied',
+        message: 'denied',
+      });
+
+      const store = useWorkStatusStore();
+      store.companySettings = { geolocationEnabled: true, geolocationRequired: true };
+
+      const result = await store.checkIn('shift_start');
+
+      expect(result).toBe(false);
+      expect(mockApi.post).not.toHaveBeenCalled();
+      expect(store.locationError?.messageKey).toBe('geolocation.errors.permissionDenied');
+    });
+
+    it('retryLocation clears the previous error and asks again', async () => {
+      const store = useWorkStatusStore();
+      store.companySettings = { geolocationEnabled: true, geolocationRequired: true };
+      store.locationError = { code: 3, messageKey: 'geolocation.errors.timeout', message: 'timeout' };
+
+      const location = await store.retryLocation();
+
+      expect(location).not.toBeNull();
+      expect(store.locationError).toBeNull();
     });
   });
 

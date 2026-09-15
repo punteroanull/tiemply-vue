@@ -603,6 +603,19 @@ export default {
     troubleshootingStep4: 'En móvil: Revisa la configuración de ubicación del navegador',
     locationError: 'Error de ubicación',
     locationAvailable: 'Ubicación disponible',
-    locationPending: 'Ubicación pendiente'
+    locationPending: 'Ubicación pendiente',
+    retry: 'Reintentar',
+    gettingLocation: 'Obteniendo ubicación…',
+    errors: {
+      notSupported: 'Tu navegador no permite obtener la ubicación. Abre la aplicación en Chrome o Safari actualizados y comprueba que la dirección empieza por https.',
+      permissionDenied: 'has bloqueado el acceso a la ubicación. Pulsa el icono del candado en la barra de direcciones y permite la ubicación para este sitio.',
+      positionUnavailable: 'tu dispositivo no ha podido determinar la ubicación. Comprueba que la ubicación del sistema está activada y vuelve a intentarlo.',
+      timeout: 'se ha agotado el tiempo de espera al obtener la ubicación. Acércate a una ventana o sal al exterior y vuelve a intentarlo.',
+      unknown: 'no se ha podido obtener la ubicación.',
+      requiredIntro: 'No se puede fichar: {reason}',
+      optionalIntro: 'Se fichará sin ubicación: {reason}',
+      abortedCheckIn: 'No se ha podido fichar la entrada porque no se ha obtenido la ubicación, que tu empresa exige.',
+      abortedCheckOut: 'No se ha podido fichar la salida porque no se ha obtenido la ubicación, que tu empresa exige.'
+    }
   }
 }

@@ -4,6 +4,7 @@ import { ref, computed } from "vue";
 import api from "../services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "./auth";
+import i18n from "../i18n";
 import { format, formatDistance, parseISO, isValid } from "date-fns";
 
 // Helper function to safely parse and validate a date string
@@ -75,6 +76,11 @@ interface CompanySettings {
 export const useWorkStatusStore = defineStore("workStatus", () => {
   const toast = useToast();
   const authStore = useAuthStore();
+
+  // The store lives outside the component tree, so it uses the global i18n instance rather
+  // than useI18n(). Messages shown here were hardcoded in English until now.
+  const t = (key: string, params?: Record<string, unknown>) =>
+    (i18n.global.t as (k: string, p?: Record<string, unknown>) => string)(key, params);
 
   const status = ref<WorkStatus | null>(null);
   const loading = ref(false);
@@ -191,7 +197,24 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   }
 
   async function getCurrentLocation(): Promise<GeolocationData | null> {
-    if (!isGeolocationEnabled.value || !isGeolocationAvailableComputed.value) {
+    // The company does not use geolocation: no location, and nothing to tell the user.
+    if (!isGeolocationEnabled.value) {
+      return null;
+    }
+
+    // The browser has no geolocation API at all (an insecure context, typically). This used to
+    // return null silently, which made the clock-in button do nothing whatsoever.
+    if (!isGeolocationAvailableComputed.value) {
+      locationError.value = {
+        code: 0,
+        messageKey: "geolocation.errors.notSupported",
+        message: "Geolocation is not supported by this browser.",
+      };
+
+      if (isGeolocationRequired.value) {
+        toast.error(t("geolocation.errors.notSupported"));
+      }
+
       return null;
     }
 
@@ -217,24 +240,34 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
       return location;
     } catch (error) {
-      locationError.value = error as GeolocationError;
+      const geoError = error as GeolocationError;
+      locationError.value = geoError;
+      console.warn("Could not get location:", geoError.message);
+
+      const reason = t(geoError.messageKey ?? "geolocation.errors.unknown");
 
       if (isGeolocationRequired.value) {
-        toast.error(
-          `Location is required: ${(error as GeolocationError).message}`
-        );
-        return null;
+        toast.error(t("geolocation.errors.requiredIntro", { reason }));
       } else {
-        toast.warning(
-          `Could not get location: ${
-            (error as GeolocationError).message
-          }. Proceeding without location.`
-        );
-        return null;
+        toast.warning(t("geolocation.errors.optionalIntro", { reason }));
       }
+
+      return null;
     } finally {
       gettingLocation.value = false;
     }
+  }
+
+  /**
+   * Clear the last location failure and try again.
+   *
+   * Without this, a single failure left the user stuck: the clock-in button disabled itself on
+   * locationError and there was no way back other than reloading the page.
+   */
+  async function retryLocation(): Promise<GeolocationData | null> {
+    locationError.value = null;
+
+    return getCurrentLocation();
   }
 
   async function fetchStatus() {
@@ -394,8 +427,13 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       if (isGeolocationEnabled.value) {
         location = await getCurrentLocation();
 
-        // Si la geolocalización es requerida y no se pudo obtener, abortar
+        // Si la geolocalización es requerida y no se pudo obtener, abortar. getCurrentLocation()
+        // ya ha avisado del motivo concreto; este aviso garantiza que el usuario ve algo aunque
+        // se añada en el futuro un camino que devuelva null en silencio.
         if (isGeolocationRequired.value && !location) {
+          if (!locationError.value) {
+            toast.error(t("geolocation.errors.abortedCheckIn"));
+          }
           return false;
         }
       }
@@ -502,7 +540,11 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
         // Si la geolocalización es requerida y no se pudo obtener, abortar con mensaje de error
         if (isGeolocationRequired.value && !location) {
           console.error('[CheckOut] ABORTED: Geolocation required but not available');
-          toast.error('Location is required for check-out but could not be obtained.');
+          // getCurrentLocation() already explained the specific cause; only fall back to the
+          // generic message when it somehow returned null without recording one.
+          if (!locationError.value) {
+            toast.error(t("geolocation.errors.abortedCheckOut"));
+          }
           return false;
         }
       }
@@ -796,5 +838,6 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     // Métodos de geolocalización
     fetchCompanySettings,
     getCurrentLocation,
+    retryLocation,
   };
 });

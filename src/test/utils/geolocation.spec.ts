@@ -2,12 +2,96 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   formatCoordinates,
+  getCurrentPosition,
   isGeolocationAvailable,
 } from "@/utils/geolocation";
+
+type PositionCallback = (position: any) => void;
+type ErrorCallback = (error: any) => void;
+
+/** Install a fake navigator.geolocation whose getCurrentPosition we drive per call. */
+function mockGeolocation(
+  handler: (options: PositionOptions, success: PositionCallback, failure: ErrorCallback) => void
+) {
+  const getCurrentPositionMock = vi.fn(
+    (success: PositionCallback, failure: ErrorCallback, options: PositionOptions) =>
+      handler(options, success, failure)
+  );
+
+  Object.defineProperty(global.navigator, "geolocation", {
+    value: { getCurrentPosition: getCurrentPositionMock },
+    writable: true,
+    configurable: true,
+  });
+
+  return getCurrentPositionMock;
+}
+
+function position(accuracy = 30) {
+  return {
+    coords: { latitude: 38.3476, longitude: -0.5211, accuracy },
+    timestamp: 1_700_000_000_000,
+  };
+}
 
 describe("Geolocation Utils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  describe("getCurrentPosition", () => {
+    it("resolves from the fast low-accuracy attempt without asking for GPS", async () => {
+      const spy = mockGeolocation((_options, success) => success(position()));
+
+      const result = await getCurrentPosition();
+
+      expect(result.latitude).toBe(38.3476);
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][2].enableHighAccuracy).toBe(false);
+    });
+
+    it("falls back to high accuracy when the first attempt times out", async () => {
+      let call = 0;
+      const spy = mockGeolocation((_options, success, failure) => {
+        call++;
+        if (call === 1) {
+          failure({ code: 3, message: "timeout" }); // TIMEOUT
+          return;
+        }
+        success(position(8));
+      });
+
+      const result = await getCurrentPosition();
+
+      expect(result.accuracy).toBe(8);
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect(spy.mock.calls[1][2].enableHighAccuracy).toBe(true);
+    });
+
+    it("does not retry when permission was denied", async () => {
+      // Retrying with GPS after a denial only makes the user wait for the same refusal.
+      const spy = mockGeolocation((_options, _success, failure) =>
+        failure({ code: 1, message: "denied" })
+      );
+
+      await expect(getCurrentPosition()).rejects.toMatchObject({
+        code: 1,
+        messageKey: "geolocation.errors.permissionDenied",
+      });
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects with a translatable key when the browser has no geolocation", async () => {
+      Object.defineProperty(global.navigator, "geolocation", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      await expect(getCurrentPosition()).rejects.toMatchObject({
+        messageKey: "geolocation.errors.notSupported",
+      });
+    });
   });
 
   describe("isGeolocationAvailable", () => {

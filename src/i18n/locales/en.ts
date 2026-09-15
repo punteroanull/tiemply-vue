@@ -603,6 +603,19 @@ export default {
     troubleshootingStep4: 'For mobile: Check your browser location settings',
     locationError: 'Location error',
     locationAvailable: 'Location available',
-    locationPending: 'Location pending'
+    locationPending: 'Location pending',
+    retry: 'Retry',
+    gettingLocation: 'Getting location…',
+    errors: {
+      notSupported: 'Your browser cannot provide your location. Open the app in an up-to-date Chrome or Safari and check the address starts with https.',
+      permissionDenied: 'you have blocked location access. Tap the padlock icon in the address bar and allow location for this site.',
+      positionUnavailable: 'your device could not determine your location. Check that system location is turned on and try again.',
+      timeout: 'getting your location timed out. Move near a window or step outside and try again.',
+      unknown: 'your location could not be obtained.',
+      requiredIntro: 'Cannot clock in: {reason}',
+      optionalIntro: 'Clocking in without location: {reason}',
+      abortedCheckIn: 'Could not clock in because your location was not obtained, and your company requires it.',
+      abortedCheckOut: 'Could not clock out because your location was not obtained, and your company requires it.'
+    }
   }
 }
