@@ -78,16 +78,18 @@ describe("Auth Store", () => {
           token: "test-token-123",
         },
       };
-      // Backend returns snake_case, store converts to camelCase
+      // The snake_case -> camelCase conversion lives in the api.ts response interceptor, which
+      // this suite mocks away entirely. The mock therefore has to return what the store really
+      // receives at runtime: data that is already camelCased.
       const mockUserResponse = {
         data: {
           id: "1",
           uuid: "uuid-1",
           name: "Test User",
           email: "test@example.com",
-          created_at: "2024-01-01",
-          updated_at: "2024-01-01",
-          employee_records: [{ id: "emp-1", active: true }],
+          createdAt: "2024-01-01",
+          updatedAt: "2024-01-01",
+          employeeRecords: [{ id: "emp-1", active: true }],
         },
       };
 

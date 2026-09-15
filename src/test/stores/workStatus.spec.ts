@@ -83,7 +83,9 @@ describe('workStatus Store', () => {
       await store.fetchStatus();
 
       expect(mockApi.get).toHaveBeenCalledWith('/worklogs/status/employee-123');
-      expect(store.status?.checked_in).toBe(true);
+      // The store normalises to camelCase (as the api interceptor already does), so `checkedIn`
+      // is the real property; `checked_in` was silently undefined and the assertion never held.
+      expect(store.status?.checkedIn).toBe(true);
       expect(store.currentState).toBe('working');
     });
 

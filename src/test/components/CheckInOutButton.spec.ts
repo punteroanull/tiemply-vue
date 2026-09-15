@@ -6,6 +6,7 @@ import { nextTick, ref } from "vue";
 import CheckInOutButton from "@/components/CheckInOutButton.vue";
 import StatusBadge from "@/components/StatusBadge.vue";
 import { useWorkStatusStore } from "@/stores/workStatus";
+import i18n from "@/i18n";
 import type { WorkState } from "@/types";
 
 // Mock @vueuse/core
@@ -54,6 +55,7 @@ describe("CheckInOutButton", () => {
     return mount(CheckInOutButton, {
       global: {
         plugins: [
+          i18n,
           createTestingPinia({
             createSpy: vi.fn,
             initialState: {
@@ -124,6 +126,7 @@ describe("CheckInOutButton", () => {
       wrapper = mount(CheckInOutButton, {
         global: {
           plugins: [
+            i18n,
             createTestingPinia({
               createSpy: vi.fn,
               stubActions: false,

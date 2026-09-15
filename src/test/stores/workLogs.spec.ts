@@ -80,19 +80,22 @@ describe('workLogs Store', () => {
 
   describe('fetchWeeklyReport', () => {
     it('should fetch and transform weekly report', async () => {
+      // The api.ts interceptor camelCases responses before the store sees them, and this suite
+      // mocks that module away — so the fixture has to be camelCase, and so is the output the
+      // store builds (`totalDuration`, not `total_duration`).
       const mockResponse = {
         data: {
           days: [
             {
               date: '2025-01-13',
               status: 'completed',
-              is_weekend: false,
-              shift: { start_time: '09:00', end_time: '17:00' },
-              work_time: { formatted: '8:00' },
+              isWeekend: false,
+              shift: { startTime: '09:00', endTime: '17:00' },
+              workTime: { formatted: '8:00' },
             },
           ],
           summary: {
-            work_time: { formatted: '40:00' },
+            workTime: { formatted: '40:00' },
           },
         },
       };
@@ -103,7 +106,9 @@ describe('workLogs Store', () => {
 
       expect(mockApi.get).toHaveBeenCalledWith('/worklogs/weekly-report/employee-123');
       expect(store.weeklyReport).not.toBeNull();
-      expect(store.weeklyReport?.total_duration).toBe('40:00');
+      expect(store.weeklyReport?.totalDuration).toBe('40:00');
+      expect(store.weeklyReport?.days[0].checkIn?.time).toBe('09:00');
+      expect(store.weeklyReport?.days[0].duration).toBe('8:00');
     });
   });
 
