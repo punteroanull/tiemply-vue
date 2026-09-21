@@ -37,6 +37,10 @@ FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Configuración de nginx para SPA (Vue Router)
+# index.html, sw.js y el manifest deciden que build ejecuta todo el mundo, asi que
+# no pueden quedarse en la cache HTTP. El resto lleva hash en el nombre y es inmutable.
+# Ojo: el parser de Dockerfile une estas lineas en una sola, por lo que NO se pueden
+# usar comentarios de nginx aqui dentro: comentarian el resto de la configuracion.
 RUN echo 'server { \
     listen 80; \
     server_name localhost; \
@@ -45,6 +49,18 @@ RUN echo 'server { \
     \
     location / { \
         try_files $uri $uri/ /index.html; \
+    } \
+    \
+    location = /index.html { \
+        add_header Cache-Control "no-cache, must-revalidate"; \
+    } \
+    \
+    location = /sw.js { \
+        add_header Cache-Control "no-cache, must-revalidate"; \
+    } \
+    \
+    location = /manifest.webmanifest { \
+        add_header Cache-Control "no-cache, must-revalidate"; \
     } \
     \
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ { \

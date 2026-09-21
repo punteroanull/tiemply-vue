@@ -573,6 +573,14 @@ export default {
   },
 
   // Geolocalización
+  pwa: {
+    updateAvailable: {
+      title: 'Hay una versión nueva',
+      body: 'Actualiza para tener los últimos cambios. No perderás lo que estés haciendo.',
+      action: 'Actualizar',
+      updating: 'Actualizando…'
+    }
+  },
   impersonation: {
     banner: {
       viewingAs: 'Estás viendo la app como',

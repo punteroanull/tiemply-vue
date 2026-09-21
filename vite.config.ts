@@ -15,7 +15,13 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt", not "autoUpdate": this app is used to clock in, and swapping the
+      // running build under someone mid-action is worse than a short delay. The user is
+      // told instead, and decides when. See src/services/pwaUpdate.ts.
+      registerType: "prompt",
+      // We register the worker ourselves so we can check for updates when the app comes
+      // back to the foreground, which on a phone is the only reliable moment.
+      injectRegister: null,
       includeAssets: ["favicon.svg", "apple-touch-icon.png"],
       manifest: {
         name: "Tiemply - Employee Time Management",
@@ -46,6 +52,8 @@ export default defineConfig({
         background_color: "#ffffff",
       },
       workbox: {
+        // Drop precaches from previous builds instead of letting them pile up on phones
+        cleanupOutdatedCaches: true,
         // Configuración para cachear recursos y API
         runtimeCaching: [
           {

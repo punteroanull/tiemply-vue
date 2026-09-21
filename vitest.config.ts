@@ -26,6 +26,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Only exists once vite-plugin-pwa has run, which it does not under vitest.
+      "virtual:pwa-register": fileURLToPath(
+        new URL("./src/test/mocks/pwaRegister.ts", import.meta.url)
+      ),
     },
   },
 });

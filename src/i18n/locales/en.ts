@@ -573,6 +573,14 @@ export default {
   },
 
   // Geolocation
+  pwa: {
+    updateAvailable: {
+      title: 'A new version is available',
+      body: 'Update to get the latest changes. You will not lose what you are doing.',
+      action: 'Update',
+      updating: 'Updating…'
+    }
+  },
   impersonation: {
     banner: {
       viewingAs: 'You are viewing the app as',

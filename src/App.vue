@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, computed } from 'vue'
+import UpdateAvailableBanner from './components/UpdateAvailableBanner.vue';
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import AppLayout from './layouts/AppLayout.vue'
@@ -62,6 +63,8 @@ watch(() => authStore.isAuthenticated, (newValue) => {
 </script>
 
 <template>
+  <UpdateAvailableBanner />
+
   <!-- Show spinner while router is initializing -->
   <div v-if="!routerReady" class="flex justify-center items-center min-h-screen">
     <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>

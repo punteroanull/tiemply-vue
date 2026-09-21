@@ -10,6 +10,7 @@ import router from './router'
 import i18n from './i18n'
 import './assets/main.css'
 import { setupOfflineListeners } from './utils/offlineManager'
+import { setupPwaUpdates } from "./services/pwaUpdate"
 import { vClickOutside } from './directives/clickOutside'
 
 const app = createApp(App)
@@ -37,6 +38,9 @@ app.use(Toast, {
 
 // Configurar listeners para modo offline
 setupOfflineListeners()
+
+// Registrar el service worker y vigilar si hay una version nueva
+setupPwaUpdates()
 
 app.directive('click-outside', vClickOutside)
 
