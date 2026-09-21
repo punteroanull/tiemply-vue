@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, parseISO, isSameDay, addDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday, parseISO, addDays } from 'date-fns';
 import { enUS, es } from 'date-fns/locale';
 import { useAbsencesStore } from '../stores/absences';
 
@@ -25,10 +25,17 @@ interface Absence {
   };
 }
 
-interface AbsenceRequest {
-  id: string;
+interface AbsenceRequestPeriod {
   startDate: string;
   endDate: string;
+}
+
+interface AbsenceRequest {
+  id: string;
+  // Null on period-based requests, which carry their dates in `periods` instead.
+  startDate: string | null;
+  endDate: string | null;
+  periods?: AbsenceRequestPeriod[];
   status: string;
   absenceType?: AbsenceType;
 }
@@ -80,21 +87,31 @@ const weekDays = computed(() => {
 
 // Expand request date range to individual days
 function expandRequestToDays(request: AbsenceRequest): CalendarItem[] {
-  const days: CalendarItem[] = [];
-  let current = parseISO(request.startDate);
-  const end = parseISO(request.endDate);
+  // A period-based request has no dates of its own; its periods carry them. Reading
+  // startDate directly produced an Invalid Date, the loop below never ran, and the request
+  // silently failed to appear on the calendar.
+  const ranges = request.startDate && request.endDate
+    ? [{ startDate: request.startDate, endDate: request.endDate }]
+    : (request.periods ?? []);
 
-  while (current <= end) {
-    days.push({
-      date: format(current, 'yyyy-MM-dd'),
-      type: 'request',
-      data: request,
-      absenceType: request.absenceType,
-      status: 'pending'
-    });
-    current = addDays(current, 1);
-  }
-  return days;
+  return ranges.flatMap((range) => {
+    const days: CalendarItem[] = [];
+    let current = parseISO(range.startDate);
+    const end = parseISO(range.endDate);
+
+    while (current <= end) {
+      days.push({
+        date: format(current, 'yyyy-MM-dd'),
+        type: 'request',
+        data: request,
+        absenceType: request.absenceType,
+        status: 'pending'
+      });
+      current = addDays(current, 1);
+    }
+
+    return days;
+  });
 }
 
 // Combined calendar items (absences + pending requests)
@@ -155,11 +172,6 @@ function getDayClass(day: Date) {
     'bg-neutral-50': !isSameMonth(day, currentDate.value),
     'bg-primary-50 font-semibold': isToday(day),
   };
-}
-
-// Check if day has items
-function hasItems(day: Date) {
-  return getItemsForDay(day).length > 0;
 }
 
 // Get color classes for absence type

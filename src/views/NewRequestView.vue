@@ -95,6 +95,9 @@ const vacationValidationStatus = computed(() => {
   const excess = excessDays.value;
   if (excess === 0) return { valid: true, message: "" };
 
+  // Only the error case exists. A "will use N excess days" warning would need the
+  // company's allow_vacation_excess and max_vacation_excess_days settings, which this app
+  // never fetches, so the branch that rendered it could not fire.
   return { valid: false, message: "requests.exceedsAvailable", type: "error" };
 });
 
@@ -391,12 +394,6 @@ onMounted(async () => {
               class="text-sm text-red-600 mt-2"
             >
               {{ $t(vacationValidationStatus.message) }}
-            </p>
-            <p
-              v-if="vacationValidationStatus.type === 'warning'"
-              class="text-sm text-amber-600 mt-2"
-            >
-              {{ $t(vacationValidationStatus.message, { days: vacationValidationStatus.days }) }}
             </p>
           </div>
         </div>

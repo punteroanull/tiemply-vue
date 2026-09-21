@@ -15,7 +15,7 @@ import {
 } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 
-const { t, locale } = useI18n();
+const { locale } = useI18n();
 const departmentsStore = useDepartmentsStore();
 const authStore = useAuthStore();
 

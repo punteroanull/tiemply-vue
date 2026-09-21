@@ -85,10 +85,13 @@ async function handleSubmit() {
       address: address.value || null
     })
 
-    // Store the token and redirect to dashboard
+    // Store the token and redirect to dashboard.
+    // The store's token ref has to be set too: fetchCurrentUser() returns early when it is
+    // empty, and writing to localStorage alone does not update it.
     const authToken = response.data.data.token
     localStorage.setItem('token', authToken)
-    await authStore.fetchUser()
+    authStore.token = authToken
+    await authStore.fetchCurrentUser()
     router.push('/')
   } catch (err: any) {
     if (err.response?.data?.errors) {

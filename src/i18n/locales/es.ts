@@ -204,6 +204,7 @@ export default {
     requestUpdated: 'Solicitud actualizada correctamente',
     updateError: 'Error al actualizar la solicitud',
     cannotEditApproved: 'No se pueden editar solicitudes ya aprobadas',
+    cannotEditPeriods: 'Las solicitudes por periodos se gestionan desde el detalle de la solicitud, no desde este formulario.',
     requestNotFound: 'Solicitud no encontrada',
     edit: 'Editar',
     addPeriod: 'Agregar período',

@@ -3,9 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-import { useI18n } from "vue-i18n";
 
-const { t } = useI18n();
 const router = useRouter();
 const route = useRoute();
 const absencesStore = useAbsencesStore();
@@ -28,6 +26,9 @@ const originalStatus = ref("");
 const isSubmitting = computed(() => absencesStore.submitting);
 const isLoading = computed(() => absencesStore.loading);
 const loadError = ref(false);
+
+/** A period-based request: this single-range form cannot represent it. */
+const unsupportedFormat = ref(false);
 
 // Check if request can be edited (only pending requests)
 const canEdit = computed(() => originalStatus.value === "pending");
@@ -81,6 +82,14 @@ async function loadRequest() {
 
   if (!request) {
     loadError.value = true;
+    return;
+  }
+
+  // This form edits a single date range. A period-based request keeps its dates in
+  // `periods` and has none of its own, so it cannot be represented here: loading it would
+  // show empty dates and saving would collapse every period into one range.
+  if (request.usesPeriods || !request.startDate) {
+    unsupportedFormat.value = true;
     return;
   }
 
@@ -151,6 +160,17 @@ onMounted(async () => {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <h3 class="text-lg font-medium text-red-800 mb-2">{{ $t('requests.requestNotFound') }}</h3>
+      <button @click="goBack" class="text-primary-600 hover:text-primary-800 font-medium">
+        {{ $t('newRequest.backToRequests') }}
+      </button>
+    </div>
+
+    <!-- Period-based request: not editable from this single-range form -->
+    <div v-else-if="unsupportedFormat" class="bg-amber-50 rounded-lg p-6 text-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-amber-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+      </svg>
+      <h3 class="text-lg font-medium text-amber-800 mb-2">{{ $t('requests.cannotEditPeriods') }}</h3>
       <button @click="goBack" class="text-primary-600 hover:text-primary-800 font-medium">
         {{ $t('newRequest.backToRequests') }}
       </button>

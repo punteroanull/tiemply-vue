@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
 import { useDepartmentsStore } from "../stores/departments";
 import { useAbsencesStore } from "../stores/absences";
 
-const { t, locale } = useI18n();
 const router = useRouter();
 const departmentsStore = useDepartmentsStore();
 const absencesStore = useAbsencesStore();

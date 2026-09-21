@@ -204,6 +204,7 @@ export default {
     requestUpdated: 'Request updated successfully',
     updateError: 'Failed to update request',
     cannotEditApproved: 'Cannot edit approved requests',
+    cannotEditPeriods: 'Period-based requests are managed from the request detail, not from this form.',
     requestNotFound: 'Request not found',
     edit: 'Edit',
     addPeriod: 'Add period',

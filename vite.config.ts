@@ -1,9 +1,17 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
+import { fileURLToPath } from "node:url";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // tsconfig.app.json and vitest.config.ts both resolve "@/", but this did not, so an
+  // import that type-checked and passed its tests still broke the production build.
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
   plugins: [
     vue(),
     VitePWA({

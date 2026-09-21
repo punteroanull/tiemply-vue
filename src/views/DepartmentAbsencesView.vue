@@ -7,7 +7,7 @@ import { useAbsencesStore } from "../stores/absences";
 import { format, parseISO, subMonths } from "date-fns";
 import { enUS, es } from "date-fns/locale";
 
-const { t, locale } = useI18n();
+const { locale } = useI18n();
 const router = useRouter();
 const departmentsStore = useDepartmentsStore();
 const absencesStore = useAbsencesStore();
