@@ -19,9 +19,13 @@ COPY . .
 # Variables de entorno para el build
 ARG VITE_API_URL=https://api.tiemply.com/api
 ARG VITE_APP_NAME=Tiemply
+# Where an administrator returns to after an impersonation, and where the app sends
+# them if the impersonated token dies. The panel has its own hostname.
+ARG VITE_ADMIN_URL=https://admin.tiemply.com/admin
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_APP_NAME=$VITE_APP_NAME
+ENV VITE_ADMIN_URL=$VITE_ADMIN_URL
 
 # Build para producción (omitir verificación de tipos)
 RUN npx vite build
