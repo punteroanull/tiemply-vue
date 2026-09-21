@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useWorkStatusStore } from '../stores/workStatus'
@@ -8,6 +8,7 @@ import { useHourPoolStore } from '../stores/hourPool'
 import NavBar from '../components/NavBar.vue'
 import SideBar from '../components/SideBar.vue'
 import CheckInOutButton from '../components/CheckInOutButton.vue'
+import ImpersonationBanner from '../components/ImpersonationBanner.vue'
 
 const authStore = useAuthStore()
 const workStatusStore = useWorkStatusStore()
@@ -35,20 +36,39 @@ function closeSidebar() {
 }
 
 async function handleLogout() {
+  // While impersonating, "log out" means handing the session back to the administrator,
+  // not destroying it.
+  if (authStore.isImpersonating) {
+    await authStore.stopImpersonation()
+    return
+  }
+
   await authStore.logout()
   router.push('/login')
 }
+
+// The NavBar is fixed at top-0, so the banner would sit on top of it. A body class keeps
+// the offset in one place instead of threading a prop through NavBar and SideBar.
+watch(
+  () => authStore.isImpersonating,
+  (active) => document.body.classList.toggle('has-impersonation-banner', active),
+  { immediate: true }
+)
+
+onBeforeUnmount(() => document.body.classList.remove('has-impersonation-banner'))
 </script>
 
 <template>
   <div class="min-h-screen bg-neutral-50 flex flex-col">
+    <ImpersonationBanner />
+
     <NavBar 
       :username="authStore.user?.name || ''" 
       @toggle-sidebar="toggleSidebar"
       @logout="handleLogout"
     />
     
-    <div class="flex flex-1 pt-16">
+    <div class="flex flex-1 pt-16" :class="{ 'pt-26': authStore.isImpersonating }">
       <SideBar 
         :is-open="isSidebarOpen" 
         :username="authStore.user?.name || ''"
@@ -71,3 +91,10 @@ async function handleLogout() {
     </div>
   </div>
 </template>
+<style>
+/* Push the fixed chrome down while the impersonation banner is on screen. */
+body.has-impersonation-banner nav.fixed,
+body.has-impersonation-banner aside.fixed {
+  top: 2.5rem;
+}
+</style>

@@ -339,7 +339,16 @@ export const useAbsencesStore = defineStore("absences", () => {
     }
   }
 
+  /** Drop everything cached for the current identity. */
+  function reset() {
+    absences.value = [];
+    absenceTypes.value = [];
+    requests.value = [];
+    pendingRequests.value = [];
+    teamPendingRequests.value = [];
+  }
   return {
+    reset,
     absences,
     absenceTypes,
     requests,

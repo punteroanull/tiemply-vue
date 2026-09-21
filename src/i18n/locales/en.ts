@@ -572,6 +572,19 @@ export default {
   },
 
   // Geolocation
+  impersonation: {
+    banner: {
+      viewingAs: 'You are viewing the app as',
+      readOnly: 'Read-only',
+      writeEnabled: 'You can change data',
+      exit: 'Back to my account'
+    },
+    landing: {
+      loading: 'Opening the application…',
+      failedTitle: 'The session could not be opened',
+      failedBody: 'The link is invalid or has expired. Start it again from the admin panel.'
+    }
+  },
   geolocation: {
     title: 'Location Services',
     description: 'Manage location tracking for check-in and check-out',

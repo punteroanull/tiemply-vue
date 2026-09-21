@@ -1,5 +1,10 @@
 import axios from "axios";
 import { convertKeysToCamelCase } from "../utils/caseConverter";
+import { useToast } from "vue-toastification";
+import { isReadOnlyRejection, resolveImpersonated401 } from "./impersonationErrors";
+
+// Works outside components, which is where this interceptor runs.
+const toast = useToast();
 
 // Create axios instance with base URL
 const api = axios.create({
@@ -39,13 +44,30 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
+    const status = error.response?.status;
+
+    if (status === 401) {
+      // While impersonating, a 401 means the impersonated token died. Restoring the
+      // administrator here is what keeps their own session alive.
+      const destination = resolveImpersonated401(import.meta.env.VITE_ADMIN_URL);
+
+      if (destination) {
+        window.location.href = destination;
+        return Promise.reject(error);
+      }
+
       // Unauthorized - clear token and redirect to login
       localStorage.removeItem("token");
       // Only redirect if not already on login page
       if (window.location.pathname !== "/login") {
         window.location.href = "/login";
       }
+    }
+
+    // Read-only impersonation: say so plainly instead of letting each store surface a
+    // generic failure.
+    if (status === 403 && isReadOnlyRejection(error.response?.data)) {
+      toast.warning(error.response.data.message);
     }
     return Promise.reject(error);
   }

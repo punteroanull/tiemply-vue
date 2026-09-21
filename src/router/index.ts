@@ -38,6 +38,13 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      // Landing for the admin panel handoff. Deliberately neither guest nor auth
+      // protected: the visitor may arrive with a stale session of their own.
+      path: '/impersonate',
+      name: 'impersonate',
+      component: () => import('../views/auth/ImpersonateLandingView.vue')
+    },
+    {
       path: '/login',
       name: 'login',
       component: LoginView,
@@ -170,6 +177,12 @@ router.beforeEach(async (to, _from, next) => {
   console.log("Router beforeEach - navigating to:", to.name, to.path)
   const authStore = useAuthStore()
   const departmentsStore = useDepartmentsStore()
+
+  // Before anything else: the handoff code lives for 60 seconds and the guest branch
+  // below would bounce a visitor who still has a session to the dashboard.
+  if (to.name === 'impersonate') {
+    return next()
+  }
 
   // On a hard reload / deep link the token is restored from localStorage but the
   // user (and therefore the role flags) is not loaded yet. Load it before

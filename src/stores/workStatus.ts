@@ -777,7 +777,33 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     }
   }
 
+  /**
+   * Drop everything cached for the current identity.
+   *
+   * Called when the signed-in user changes: without it, entering or leaving an
+   * impersonation carries the previous person's shift state and company settings over.
+   */
+  function reset() {
+    stopRefreshInterval();
+    stopDurationUpdateInterval();
+    status.value = null;
+    loading.value = false;
+    checkingIn.value = false;
+    checkingOut.value = false;
+    currentDuration.value = "";
+    currentState.value = 'not_working';
+    lastCategory.value = null;
+    shiftDate.value = null;
+    isNightShift.value = false;
+    effectiveHours.value = null;
+    lastOvertimeRegistered.value = null;
+    gettingLocation.value = false;
+    locationData.value = null;
+    locationError.value = null;
+    companySettings.value = {};
+  }
   return {
+    reset,
     // Estado existente
     status,
     loading,

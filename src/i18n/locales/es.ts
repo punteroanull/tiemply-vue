@@ -572,6 +572,19 @@ export default {
   },
 
   // Geolocalización
+  impersonation: {
+    banner: {
+      viewingAs: 'Estás viendo la app como',
+      readOnly: 'Solo lectura',
+      writeEnabled: 'Puedes modificar datos',
+      exit: 'Volver a mi cuenta'
+    },
+    landing: {
+      loading: 'Abriendo la aplicación…',
+      failedTitle: 'No se ha podido abrir la sesión',
+      failedBody: 'El enlace no es válido o ha caducado. Vuelve a iniciarlo desde el panel de administración.'
+    }
+  },
   geolocation: {
     title: 'Servicios de Ubicación',
     description: 'Gestionar seguimiento de ubicación para entrada y salida',

@@ -2,6 +2,13 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import api from "../services/api";
 import { useToast } from "vue-toastification";
+import { resetAllStores } from "./reset";
+
+/** The administrator's own token, parked while they view the app as someone else. */
+const ORIGINAL_TOKEN_KEY = "token_original";
+
+/** Read by the axios interceptor, which must not import this store. */
+const IMPERSONATING_KEY = "impersonating";
 // Note: snake_case to camelCase conversion is handled globally in api.ts interceptor
 
 interface Role {
@@ -54,6 +61,17 @@ interface Employee {
   department?: Department;
 }
 
+/** Context of an administrator viewing the app as someone else. */
+export interface Impersonation {
+  sessionId: string;
+  impersonatorName: string;
+  impersonatorEmail: string;
+  impersonatedName: string;
+  impersonatedEmail: string;
+  writesEnabled: boolean;
+  expiresAt: string;
+  returnUrl: string;
+}
 interface User {
   id: string;
   uuid: string;
@@ -91,10 +109,21 @@ export const useAuthStore = defineStore("auth", () => {
 
   const user = ref<User | null>(null);
   const token = ref<string | null>(localStorage.getItem("token"));
+
+  /**
+   * Impersonation context, refreshed from /me so it survives a page reload.
+   * The parked administrator token lives under a separate key, since "token" is always
+   * the one in use and is cleared on logout and on a 401.
+   */
+  const impersonation = ref<Impersonation | null>(null);
   const loading = ref(false);
   const error = ref("");
 
   const isAuthenticated = computed(() => !!token.value);
+  const isImpersonating = computed(() => !!impersonation.value);
+  const canWriteWhileImpersonating = computed(
+    () => !impersonation.value || impersonation.value.writesEnabled
+  );
 
   // Computed properties for user information
   const currentUser = computed(() => user.value);
@@ -184,6 +213,10 @@ export const useAuthStore = defineStore("auth", () => {
         token.value = responseData.token;
         localStorage.setItem("token", responseData.token);
 
+        // Signing in as someone else in the same tab used to carry the previous user's
+        // cached data over.
+        await resetAllStores();
+
         // Always fetch full user data from /me to get employee_records and other relations
         await fetchCurrentUser();
 
@@ -257,11 +290,20 @@ export const useAuthStore = defineStore("auth", () => {
       } else {
         user.value = response.data;
       }
+
+      // /me is the only thing that survives a reload, so the banner state comes from it.
+      syncImpersonation((user.value as any)?.impersonation ?? null);
+
       return user.value;
     } catch (err: any) {
       if (err.response?.status === 401) {
-        // Token is invalid or expired
-        logout();
+        // Token is invalid or expired. While impersonating this must restore the
+        // administrator rather than destroy their session.
+        if (isImpersonating.value) {
+          await stopImpersonation({ silent: true });
+        } else {
+          logout();
+        }
       }
       error.value = "Failed to fetch user profile";
       return null;
@@ -336,7 +378,10 @@ export const useAuthStore = defineStore("auth", () => {
     } finally {
       user.value = null;
       token.value = null;
+      impersonation.value = null;
       localStorage.removeItem("token");
+      localStorage.removeItem(ORIGINAL_TOKEN_KEY);
+      localStorage.removeItem(IMPERSONATING_KEY);
       toast.info("Logged out successfully");
     }
   }
@@ -422,7 +467,98 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  function syncImpersonation(context: Impersonation | null) {
+    impersonation.value = context;
+
+    if (context) {
+      localStorage.setItem(IMPERSONATING_KEY, "1");
+    } else {
+      localStorage.removeItem(IMPERSONATING_KEY);
+    }
+  }
+
+  /**
+   * Exchange the single-use handoff code coming from the admin panel for a token.
+   */
+  async function redeemImpersonation(code: string): Promise<boolean> {
+    try {
+      const response = await api.post("/impersonation/redeem", { code });
+      const data = response.data?.data ?? response.data;
+
+      if (!data?.token) {
+        toast.error("Invalid impersonation link");
+        return false;
+      }
+
+      // Park the administrator's own session if they had one in this browser.
+      if (token.value && localStorage.getItem(IMPERSONATING_KEY) !== "1") {
+        localStorage.setItem(ORIGINAL_TOKEN_KEY, token.value);
+      }
+
+      token.value = data.token;
+      localStorage.setItem("token", data.token);
+      syncImpersonation(data.impersonation ?? null);
+
+      await resetAllStores();
+      await fetchCurrentUser();
+
+      return true;
+    } catch (err: any) {
+      const message = err.response?.data?.message ?? "The impersonation link is no longer valid";
+      toast.error(message);
+      return false;
+    }
+  }
+
+  /**
+   * Hand the session back to the administrator.
+   *
+   * Returns them to their own session if they had one in this browser, and to the admin
+   * panel otherwise, which is the usual case: platform administrators rarely have an
+   * employee record, and the app would be empty for them.
+   */
+  async function stopImpersonation(options: { silent?: boolean } = {}): Promise<void> {
+    const returnUrl = impersonation.value?.returnUrl;
+
+    try {
+      await api.post("/impersonation/stop");
+    } catch (err) {
+      // The token may already be gone (expired or revoked): finish locally anyway.
+      console.warn("Could not close the impersonation server-side:", err);
+    }
+
+    const original = localStorage.getItem(ORIGINAL_TOKEN_KEY);
+
+    impersonation.value = null;
+    localStorage.removeItem(IMPERSONATING_KEY);
+    localStorage.removeItem(ORIGINAL_TOKEN_KEY);
+
+    await resetAllStores();
+
+    if (original) {
+      token.value = original;
+      localStorage.setItem("token", original);
+      await fetchCurrentUser();
+
+      if (!options.silent) {
+        toast.info("Back to your own account");
+      }
+
+      return;
+    }
+
+    token.value = null;
+    user.value = null;
+    localStorage.removeItem("token");
+
+    window.location.href = returnUrl ?? (import.meta.env.VITE_ADMIN_URL ?? "/") + "";
+  }
   return {
+    impersonation,
+    isImpersonating,
+    canWriteWhileImpersonating,
+    redeemImpersonation,
+    stopImpersonation,
     // State
     user,
     token,

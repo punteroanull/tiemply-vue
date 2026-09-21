@@ -349,7 +349,16 @@ export const useWorkLogsStore = defineStore("workLogs", () => {
     }
   }
 
+  /** Drop everything cached for the current identity. */
+  function reset() {
+    dailyReport.value = null;
+    weeklyReport.value = null;
+    monthlyReport.value = null;
+    loading.value = false;
+    exporting.value = false;
+  }
   return {
+    reset,
     dailyReport,
     weeklyReport,
     monthlyReport,
