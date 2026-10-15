@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAbsencesStore } from "../stores/absences";
 import { useAuthStore } from "../stores/auth";
-import { format, subDays } from "date-fns";
+import { earliestRequestDate } from "../utils/requestDates";
 import api from "../services/api";
 
 const router = useRouter();
@@ -37,18 +37,10 @@ const companyAdvanceDays = ref<number>(0);
 const isSubmitting = computed(() => absencesStore.submitting);
 const isLoading = computed(() => absencesStore.loading);
 
-// Get minimum date (today minus advance days configured in company)
-// The backend sends a negative value (e.g. -5) to allow selecting dates N days in the past
-const advanceDays = computed(() => {
-  return Math.abs(companyAdvanceDays.value);
-});
-
-const minDate = computed(() => {
-  const baseDate = advanceDays.value > 0
-    ? subDays(new Date(), advanceDays.value)
-    : new Date();
-  return format(baseDate, "yyyy-MM-dd");
-});
+// Earliest start date, as the API enforces it (see earliestRequestDate)
+const minDate = computed(() =>
+  earliestRequestDate(selectedTypeDetails.value?.code, companyAdvanceDays.value)
+);
 
 // Get employee's remaining vacation days
 const remainingVacationDays = computed(() => {
