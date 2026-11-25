@@ -68,46 +68,8 @@ Todas las respuestas de la API siguen el formato definido en el trait `ApiRespon
 
 ### 1.1 Registro de Usuario
 
-**Endpoint:** `POST /register`
-**Autenticación:** No requerida
-**Controlador:** `AuthController@register`
-
-#### Request Body
-```json
-{
-  "name": "string (requerido, max:255)",
-  "email": "string (requerido, email, unique, max:255)",
-  "password": "string (requerido, min:8)",
-  "password_confirmation": "string (requerido, debe coincidir con password)",
-  "identification_number": "string (opcional, max:20)",
-  "birth_date": "date (opcional, formato: YYYY-MM-DD)",
-  "phone": "string (opcional, max:20)",
-  "address": "string (opcional, max:255)",
-  "role_id": "uuid (opcional, exists:roles,id)"
-}
-```
-
-#### Response (201)
-```json
-{
-  "success": true,
-  "message": "Usuario registrado exitosamente",
-  "data": {
-    "user": {
-      "id": "uuid",
-      "name": "string",
-      "email": "string",
-      "identification_number": "string",
-      "birth_date": "date",
-      "phone": "string",
-      "address": "string",
-      "role_id": "uuid",
-      "created_at": "datetime",
-      "updated_at": "datetime"
-    }
-  }
-}
-```
+Retirado. `POST /register` ya no existe (404): solo hay alta de empresas, y las personas
+entran por invitación.
 
 ---
 
@@ -215,12 +177,95 @@ Todas las respuestas de la API siguen el formato definido en el trait `ApiRespon
         "id": "uuid",
         "name": "string",
         "tax_id": "string",
-        "contact_email": "string"
+        "contact_email": "string",
+        "features": ["overtime", "geolocation", "export_reports", "departments_advanced", "employee_schedules", "guard_shifts"]
       }
     }
   ],
+  "supervised_departments": [
+    { "id": "uuid", "name": "string", "company_id": "uuid" }
+  ],
   "created_at": "datetime",
   "updated_at": "datetime"
+}
+```
+
+---
+
+### 1.5 Actualizar el propio perfil
+
+**Endpoint:** `PUT /me`
+**Autenticación:** Requerida
+**Controlador:** `AccountController@updateProfile`
+
+No cambia el email ni el rol.
+
+#### Request Body
+```json
+{
+  "name": "string (opcional, max:255)",
+  "phone": "string|null (opcional, max:20)",
+  "address": "string|null (opcional, max:255)"
+}
+```
+
+#### Response (200)
+El usuario actualizado.
+
+---
+
+### 1.6 Cambiar la propia contraseña
+
+**Endpoint:** `PUT /me/password`
+**Autenticación:** Requerida
+**Controlador:** `AccountController@updatePassword`
+
+Cierra las demás sesiones del usuario. Responde `403` en una sesión de impersonación.
+
+#### Request Body
+```json
+{
+  "current_password": "string (requerido)",
+  "password": "string (requerido, min:8, distinta de la actual)",
+  "password_confirmation": "string (requerido, debe coincidir con password)"
+}
+```
+
+---
+
+### 1.7 Solicitar enlace de restablecimiento
+
+**Endpoint:** `POST /password/forgot`
+**Autenticación:** No requerida
+**Controlador:** `AccountController@forgotPassword`
+
+Responde siempre `200` con el mismo mensaje, exista o no la cuenta. El correo enlaza a
+`{FRONTEND_URL}/reset-password?token=…&email=…`.
+
+#### Request Body
+```json
+{
+  "email": "string (requerido, email)"
+}
+```
+
+---
+
+### 1.8 Restablecer la contraseña
+
+**Endpoint:** `POST /password/reset`
+**Autenticación:** No requerida
+**Controlador:** `AccountController@resetPassword`
+
+Responde `200`, o `422` con `errors.token` si el enlace no es válido o ha caducado.
+
+#### Request Body
+```json
+{
+  "token": "string (requerido)",
+  "email": "string (requerido, email)",
+  "password": "string (requerido, min:8)",
+  "password_confirmation": "string (requerido, debe coincidir con password)"
 }
 ```
 

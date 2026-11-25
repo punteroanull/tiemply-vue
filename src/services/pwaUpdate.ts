@@ -40,11 +40,16 @@ export function scheduleUpdateChecks(
   const target = options.target ?? document;
 
   const check = () => {
-    try {
-      registration.update();
-    } catch (error) {
-      // Offline, or the worker is gone: nothing to do but try again next time.
+    // Offline, or the worker is gone: nothing to do but try again next time. update()
+    // returns a promise, so a try/catch alone left an unhandled rejection on every
+    // foreground event without signal.
+    const failed = (error: unknown) =>
       console.warn("Could not check for an application update:", error);
+
+    try {
+      Promise.resolve(registration.update()).catch(failed);
+    } catch (error) {
+      failed(error);
     }
   };
 

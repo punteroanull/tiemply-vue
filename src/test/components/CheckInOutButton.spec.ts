@@ -25,11 +25,6 @@ vi.mock("vue-toastification", () => ({
   }),
 }));
 
-// Mock offlineManager
-vi.mock("@/utils/offlineManager", () => ({
-  savePendingAction: vi.fn(),
-}));
-
 // Mock v-click-outside directive
 const clickOutsideDirective = {
   mounted() {},
@@ -243,7 +238,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const actionButton = wrapper.findAll('[class*="w-full flex items-center"]')[0];
       await actionButton.trigger("click");
-      expect(store.startShift).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("shift_start");
     });
 
     it("calls startBreak when Start Break is clicked", async () => {
@@ -252,7 +247,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const breakButton = wrapper.findAll('[class*="w-full flex items-center"]')[0];
       await breakButton.trigger("click");
-      expect(store.startBreak).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("break_start");
     });
 
     it("calls startOffsite when Go Offsite is clicked", async () => {
@@ -261,7 +256,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const offsiteButton = wrapper.findAll('[class*="w-full flex items-center"]')[1];
       await offsiteButton.trigger("click");
-      expect(store.startOffsite).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("offsite_start");
     });
 
     it("calls endShift when End Shift is clicked", async () => {
@@ -270,7 +265,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const endButton = wrapper.findAll('[class*="w-full flex items-center"]')[2];
       await endButton.trigger("click");
-      expect(store.endShift).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("shift_end");
     });
 
     it("calls endBreak when Return from Break is clicked", async () => {
@@ -279,7 +274,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const actionButton = wrapper.findAll('[class*="w-full flex items-center"]')[0];
       await actionButton.trigger("click");
-      expect(store.endBreak).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("break_end");
     });
 
     it("calls endOffsite when Return to Office is clicked", async () => {
@@ -288,7 +283,7 @@ describe("CheckInOutButton", () => {
       await wrapper.find("button").trigger("click");
       const actionButton = wrapper.findAll('[class*="w-full flex items-center"]')[0];
       await actionButton.trigger("click");
-      expect(store.endOffsite).toHaveBeenCalled();
+      expect(store.requestAction).toHaveBeenCalledWith("offsite_end");
     });
   });
 
@@ -300,24 +295,38 @@ describe("CheckInOutButton", () => {
       expect(wrapper.text()).toContain("Offline");
     });
 
-    it("saves pending action when offline and action is triggered", async () => {
+    it("hands the action to the store when offline, which queues it", async () => {
+      // Queueing lives in the store so the dashboard buttons get it too; see
+      // stores/workStatus.spec.ts for the queue itself.
       mockIsOnline.value = false;
-      const { savePendingAction } = await import("@/utils/offlineManager");
       wrapper = createWrapper({ currentState: "not_working" });
       const store = useWorkStatusStore();
-      vi.spyOn(store, "getEmployeeId").mockReturnValue("emp-123");
       await wrapper.find("button").trigger("click");
       const actionButton = wrapper.findAll('[class*="w-full flex items-center"]')[0];
       await actionButton.trigger("click");
-      expect(savePendingAction).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: "check-in",
-          employeeId: "emp-123",
-          data: expect.objectContaining({
-            category: "shift_start",
-          }),
-        })
-      );
+      expect(store.requestAction).toHaveBeenCalledWith("shift_start");
+    });
+
+    it("shows how many entries are waiting to sync", async () => {
+      wrapper = createWrapper({ pendingCount: 2 } as any);
+      expect(wrapper.text()).toContain("2 entries waiting to sync");
+    });
+  });
+
+  describe("Accessibility", () => {
+    it("exposes the menu state on the main button", async () => {
+      wrapper = createWrapper({ currentState: "working" });
+      const button = wrapper.find("button");
+      expect(button.attributes("aria-haspopup")).toBe("menu");
+      expect(button.attributes("aria-expanded")).toBe("false");
+      await button.trigger("click");
+      expect(button.attributes("aria-expanded")).toBe("true");
+      expect(wrapper.findAll('[role="menuitem"]')).toHaveLength(3);
+    });
+
+    it("says what it is waiting for while the position is being obtained", () => {
+      wrapper = createWrapper({ gettingLocation: true });
+      expect(wrapper.text()).toContain("Getting location");
     });
   });
 

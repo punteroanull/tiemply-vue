@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { format, parseISO } from "date-fns";
-import { enUS, es } from "date-fns/locale";
 import { useHourPoolStore } from "../stores/hourPool";
-import type { EntryType, SourceType } from "../types";
+import ErrorState from "../components/ErrorState.vue";
+import { formatApiDate } from "../utils/apiDates";
+import type { EntryType, HourPoolEntry, SourceType } from "../types";
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const hourPoolStore = useHourPoolStore();
 
 const selectedYear = ref(new Date().getFullYear());
@@ -14,19 +14,30 @@ const selectedType = ref<EntryType | "">("");
 const selectedSourceType = ref<SourceType | "">("");
 const currentPage = ref(1);
 
-const dateLocale = computed(() => (locale.value === "es" ? es : enUS));
-
+// Past years and this one: a year that has not started has no entries.
 const years = computed(() => {
   const currentYear = new Date().getFullYear();
-  return [currentYear - 1, currentYear, currentYear + 1];
+  return [currentYear - 2, currentYear - 1, currentYear];
 });
+
+const hasFilters = computed(
+  () => selectedType.value !== "" || selectedSourceType.value !== ""
+);
+
+const sourceTypes: SourceType[] = [
+  "overtime_approved",
+  "late_arrival",
+  "early_departure",
+  "incident_reversal",
+  "manual_adjustment",
+];
 
 function getStatusColor(status: string): string {
   switch (status) {
     case "company_owes":
-      return "text-green-600";
+      return "text-green-700";
     case "employee_owes":
-      return "text-red-600";
+      return "text-red-700";
     default:
       return "text-neutral-600";
   }
@@ -45,8 +56,8 @@ function getStatusBgColor(status: string): string {
 
 function getEntryTypeBadgeClass(type: EntryType): string {
   return type === "credit"
-    ? "bg-green-100 text-green-700"
-    : "bg-red-100 text-red-700";
+    ? "bg-green-100 text-green-800"
+    : "bg-red-100 text-red-800";
 }
 
 function getSourceTypeLabel(sourceType: SourceType): string {
@@ -54,21 +65,21 @@ function getSourceTypeLabel(sourceType: SourceType): string {
 }
 
 function formatDate(dateStr: string): string {
-  try {
-    return format(parseISO(dateStr), "PPP", { locale: dateLocale.value });
-  } catch {
-    return dateStr;
-  }
+  return formatApiDate(dateStr, "PPP") || dateStr;
 }
 
 function formatMinutes(minutes: number): string {
-  const absMinutes = Math.abs(minutes);
+  const absMinutes = Math.round(Math.abs(minutes));
   const h = Math.floor(absMinutes / 60);
   const m = absMinutes % 60;
-  const sign = minutes < 0 ? "-" : "";
-  if (h > 0 && m > 0) return `${sign}${h}h ${m}m`;
-  if (h > 0) return `${sign}${h}h`;
-  return `${sign}${m}m`;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+// Signed, so credit and debit can be told apart without relying on the badge colour.
+function formatEntryAmount(entry: HourPoolEntry): string {
+  return `${entry.type === "credit" ? "+" : "−"}${formatMinutes(entry.minutes)}`;
 }
 
 async function loadBalance() {
@@ -77,6 +88,8 @@ async function loadBalance() {
 
 async function loadEntries() {
   await hourPoolStore.fetchEntries({
+    startDate: `${selectedYear.value}-01-01`,
+    endDate: `${selectedYear.value}-12-31`,
     type: selectedType.value || undefined,
     sourceType: selectedSourceType.value || undefined,
     page: currentPage.value,
@@ -84,14 +97,25 @@ async function loadEntries() {
   });
 }
 
+async function loadAll() {
+  await Promise.all([loadBalance(), loadEntries()]);
+}
+
 async function changeYear(year: number) {
   selectedYear.value = year;
-  await loadBalance();
+  currentPage.value = 1;
+  await loadAll();
 }
 
 async function changePage(page: number) {
+  if (page < 1 || page > hourPoolStore.totalPages) return;
   currentPage.value = page;
   await loadEntries();
+}
+
+function clearFilters() {
+  selectedType.value = "";
+  selectedSourceType.value = "";
 }
 
 watch([selectedType, selectedSourceType], () => {
@@ -99,21 +123,45 @@ watch([selectedType, selectedSourceType], () => {
   loadEntries();
 });
 
-onMounted(async () => {
-  if (!hourPoolStore.canViewHourPool) return;
-  await Promise.all([loadBalance(), loadEntries()]);
-});
+// The permission depends on company settings that the layout fetches without waiting, so
+// on a reload it turns true after this view mounted. Load whenever it becomes true.
+watch(
+  () => hourPoolStore.canViewHourPool,
+  (canView) => {
+    if (canView) loadAll();
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
-  <!-- Access denied -->
-  <div v-if="!hourPoolStore.canViewHourPool" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Company settings still loading: do not flash "not available" -->
+  <div
+    v-if="!hourPoolStore.canViewHourPool && !hourPoolStore.settingsLoaded"
+    class="flex items-center justify-center py-12"
+    role="status"
+  >
+    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" aria-hidden="true"></div>
+    <span class="sr-only">{{ t("common.loading") }}</span>
+  </div>
+
+  <!-- Access denied / not on the company plan -->
+  <div
+    v-else-if="!hourPoolStore.canViewHourPool || hourPoolStore.featureUnavailable"
+    class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+  >
     <div class="bg-white rounded-lg border border-neutral-200 p-8 text-center">
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto text-neutral-400">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto text-neutral-400" aria-hidden="true">
         <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
       </svg>
-      <h3 class="mt-4 text-lg font-medium text-neutral-900">{{ t("hourPool.notAvailable") }}</h3>
-      <p class="mt-2 text-neutral-500">{{ t("hourPool.notAvailableDescription") }}</p>
+      <template v-if="hourPoolStore.featureUnavailable">
+        <h3 class="mt-4 text-lg font-medium text-neutral-900">{{ t("hourPool.notAvailableOnPlan") }}</h3>
+        <p class="mt-2 text-neutral-500">{{ t("hourPool.notAvailableOnPlanDescription") }}</p>
+      </template>
+      <template v-else>
+        <h3 class="mt-4 text-lg font-medium text-neutral-900">{{ t("hourPool.notAvailable") }}</h3>
+        <p class="mt-2 text-neutral-500">{{ t("hourPool.notAvailableDescription") }}</p>
+      </template>
     </div>
   </div>
 
@@ -129,8 +177,9 @@ onMounted(async () => {
 
       <!-- Year selector -->
       <div class="flex items-center gap-2 mt-4 md:mt-0">
-        <label class="text-sm text-neutral-600">{{ t("overtime.year") }}:</label>
+        <label for="hour-pool-year" class="text-sm text-neutral-600">{{ t("overtime.year") }}:</label>
         <select
+          id="hour-pool-year"
           :value="selectedYear"
           @change="changeYear(Number(($event.target as HTMLSelectElement).value))"
           class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
@@ -142,17 +191,32 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Loading state -->
-    <div v-if="hourPoolStore.loading" class="flex items-center justify-center py-12">
-      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+    <!-- First load only: changing the year keeps the page in place -->
+    <div
+      v-if="hourPoolStore.loading && !hourPoolStore.balance"
+      class="flex items-center justify-center py-12"
+      role="status"
+    >
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" aria-hidden="true"></div>
+      <span class="sr-only">{{ t("common.loading") }}</span>
     </div>
+
+    <!-- Failed to load the balance -->
+    <ErrorState
+      v-else-if="hourPoolStore.balanceError"
+      :retrying="hourPoolStore.loading"
+      @retry="loadAll"
+    />
 
     <div v-else>
       <!-- Balance card -->
       <div
         v-if="hourPoolStore.balance"
         class="rounded-lg border p-6 mb-6"
-        :class="getStatusBgColor(hourPoolStore.balance.confirmed.status)"
+        :class="[
+          getStatusBgColor(hourPoolStore.balance.confirmed.status),
+          { 'opacity-60': hourPoolStore.loading },
+        ]"
       >
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <!-- Net balance -->
@@ -173,13 +237,13 @@ onMounted(async () => {
           <div class="flex justify-center gap-8 md:gap-12">
             <div class="text-center">
               <p class="text-sm text-neutral-500 mb-1">{{ t("hourPool.credits") }}</p>
-              <p class="text-xl font-semibold text-green-600">
+              <p class="text-xl font-semibold text-green-700">
                 {{ hourPoolStore.balance.confirmed.formattedCredits }}
               </p>
             </div>
             <div class="text-center">
               <p class="text-sm text-neutral-500 mb-1">{{ t("hourPool.debits") }}</p>
-              <p class="text-xl font-semibold text-red-600">
+              <p class="text-xl font-semibold text-red-700">
                 {{ hourPoolStore.balance.confirmed.formattedDebits }}
               </p>
             </div>
@@ -187,8 +251,10 @@ onMounted(async () => {
 
           <!-- Pending overtime -->
           <div class="text-center md:text-right">
-            <p class="text-sm text-neutral-500 mb-1">{{ t("hourPool.pendingOvertime") }}</p>
-            <p class="text-xl font-semibold text-amber-600">
+            <p class="text-sm text-neutral-500 mb-1">
+              {{ t("hourPool.pendingOvertime") }} ({{ selectedYear }})
+            </p>
+            <p class="text-xl font-semibold text-amber-700">
               {{ hourPoolStore.balance.formattedPendingOvertime }}
             </p>
             <p class="text-sm text-neutral-500 mt-1">
@@ -199,6 +265,38 @@ onMounted(async () => {
             </p>
           </div>
         </div>
+        <!-- What moved in the selected year, apart from the running total above -->
+        <dl
+          v-if="hourPoolStore.balance.yearActivity"
+          class="mt-6 pt-4 border-t border-neutral-200 flex flex-wrap items-baseline gap-x-8 gap-y-2 text-sm"
+        >
+          <dt class="font-medium text-neutral-700 w-full sm:w-auto">
+            {{ t("hourPool.yearActivity", { year: hourPoolStore.balance.year ?? selectedYear }) }}
+          </dt>
+          <div class="flex gap-2">
+            <dt class="text-neutral-500">{{ t("hourPool.credits") }}</dt>
+            <dd class="font-semibold text-green-700">
+              {{ hourPoolStore.balance.yearActivity.formattedCredits }}
+            </dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-neutral-500">{{ t("hourPool.debits") }}</dt>
+            <dd class="font-semibold text-red-700">
+              {{ hourPoolStore.balance.yearActivity.formattedDebits }}
+            </dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-neutral-500">{{ t("hourPool.yearNet") }}</dt>
+            <dd
+              class="font-semibold"
+              :class="getStatusColor(hourPoolStore.balance.yearActivity.status)"
+            >
+              {{ hourPoolStore.balance.yearActivity.formattedBalance }}
+            </dd>
+          </div>
+        </dl>
+        <!-- The balance is not per year: say so next to the year selector's effect. -->
+        <p class="mt-4 text-xs text-neutral-500">{{ t("hourPool.allTimeBalanceHint") }}</p>
       </div>
 
       <!-- Entries section -->
@@ -206,7 +304,7 @@ onMounted(async () => {
         <div class="p-4 border-b border-neutral-200">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h2 class="text-lg font-medium text-neutral-800">
-              {{ t("hourPool.entries") }}
+              {{ t("hourPool.entries") }} {{ selectedYear }}
               <span v-if="hourPoolStore.totalEntries > 0" class="text-sm font-normal text-neutral-500">
                 ({{ hourPoolStore.totalEntries }})
               </span>
@@ -216,6 +314,7 @@ onMounted(async () => {
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <select
                 v-model="selectedType"
+                :aria-label="t('hourPool.filterByType')"
                 class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
               >
                 <option value="">{{ t("hourPool.allTypes") }}</option>
@@ -225,22 +324,31 @@ onMounted(async () => {
 
               <select
                 v-model="selectedSourceType"
+                :aria-label="t('hourPool.filterBySource')"
                 class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
               >
                 <option value="">{{ t("hourPool.allSources") }}</option>
-                <option value="overtime_approved">{{ t("hourPool.sourceTypes.overtime_approved") }}</option>
-                <option value="late_arrival">{{ t("hourPool.sourceTypes.late_arrival") }}</option>
-                <option value="early_departure">{{ t("hourPool.sourceTypes.early_departure") }}</option>
-                <option value="incident_reversal">{{ t("hourPool.sourceTypes.incident_reversal") }}</option>
-                <option value="manual_adjustment">{{ t("hourPool.sourceTypes.manual_adjustment") }}</option>
+                <option v-for="source in sourceTypes" :key="source" :value="source">
+                  {{ t(`hourPool.sourceTypes.${source}`) }}
+                </option>
               </select>
             </div>
           </div>
         </div>
 
         <!-- Loading entries -->
-        <div v-if="hourPoolStore.loadingEntries" class="flex items-center justify-center py-12">
-          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+        <div
+          v-if="hourPoolStore.loadingEntries"
+          class="flex items-center justify-center py-12"
+          role="status"
+        >
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600" aria-hidden="true"></div>
+          <span class="sr-only">{{ t("common.loading") }}</span>
+        </div>
+
+        <!-- Failed to load the entries -->
+        <div v-else-if="hourPoolStore.entriesError" class="p-4">
+          <ErrorState @retry="loadEntries" />
         </div>
 
         <!-- Entries table -->
@@ -250,22 +358,22 @@ onMounted(async () => {
             <table class="min-w-full divide-y divide-neutral-200">
               <thead class="bg-neutral-50">
                 <tr>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     {{ t("hourPool.date") }}
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     {{ t("hourPool.type") }}
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                    {{ t("hourPool.minutes") }}
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {{ t("hourPool.amount") }}
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     {{ t("hourPool.source") }}
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     {{ t("hourPool.description") }}
                   </th>
-                  <th class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                  <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
                     {{ t("hourPool.createdBy") }}
                   </th>
                 </tr>
@@ -287,13 +395,13 @@ onMounted(async () => {
                       {{ t(`hourPool.${entry.type}`) }}
                     </span>
                   </td>
-                  <td class="px-4 py-3 text-sm font-medium text-neutral-900">
-                    {{ formatMinutes(entry.minutes) }}
+                  <td class="px-4 py-3 text-sm font-medium text-neutral-900 whitespace-nowrap">
+                    {{ formatEntryAmount(entry) }}
                   </td>
                   <td class="px-4 py-3 text-sm text-neutral-600">
                     {{ getSourceTypeLabel(entry.sourceType) }}
                   </td>
-                  <td class="px-4 py-3 text-sm text-neutral-500 max-w-xs truncate">
+                  <td class="px-4 py-3 text-sm text-neutral-500 max-w-xs truncate" :title="entry.description || undefined">
                     {{ entry.description || "-" }}
                   </td>
                   <td class="px-4 py-3 text-sm text-neutral-500">
@@ -323,12 +431,16 @@ onMounted(async () => {
                 </span>
               </div>
               <div class="flex justify-between items-center text-sm mb-1">
-                <span class="text-neutral-500">{{ t("hourPool.minutes") }}:</span>
-                <span class="font-medium text-neutral-900">{{ formatMinutes(entry.minutes) }}</span>
+                <span class="text-neutral-500">{{ t("hourPool.amount") }}:</span>
+                <span class="font-medium text-neutral-900">{{ formatEntryAmount(entry) }}</span>
               </div>
               <div class="flex justify-between items-center text-sm mb-1">
                 <span class="text-neutral-500">{{ t("hourPool.source") }}:</span>
                 <span class="text-neutral-600">{{ getSourceTypeLabel(entry.sourceType) }}</span>
+              </div>
+              <div v-if="entry.creator?.name" class="flex justify-between items-center text-sm mb-1">
+                <span class="text-neutral-500">{{ t("hourPool.createdBy") }}:</span>
+                <span class="text-neutral-600">{{ entry.creator.name }}</span>
               </div>
               <div v-if="entry.description" class="text-sm text-neutral-500 mt-2">
                 {{ entry.description }}
@@ -337,9 +449,10 @@ onMounted(async () => {
           </div>
 
           <!-- Pagination -->
-          <div
+          <nav
             v-if="hourPoolStore.totalPages > 1"
-            class="px-4 py-3 border-t border-neutral-200 flex items-center justify-between"
+            class="px-4 py-3 border-t border-neutral-200 flex items-center justify-between gap-3"
+            :aria-label="t('hourPool.pagination')"
           >
             <p class="text-sm text-neutral-500">
               {{ t("hourPool.showing") }}
@@ -349,21 +462,23 @@ onMounted(async () => {
             </p>
             <div class="flex gap-2">
               <button
-                :disabled="currentPage === 1"
+                type="button"
+                :disabled="currentPage <= 1"
                 @click="changePage(currentPage - 1)"
-                class="px-3 py-1 text-sm rounded-md border border-neutral-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50"
+                class="btn-outline min-h-[44px] text-sm"
               >
-                {{ t("common.back") }}
+                {{ t("common.previous") }}
               </button>
               <button
-                :disabled="currentPage === hourPoolStore.totalPages"
+                type="button"
+                :disabled="currentPage >= hourPoolStore.totalPages"
                 @click="changePage(currentPage + 1)"
-                class="px-3 py-1 text-sm rounded-md border border-neutral-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neutral-50"
+                class="btn-outline min-h-[44px] text-sm"
               >
                 {{ t("common.next") }}
               </button>
             </div>
-          </div>
+          </nav>
         </div>
 
         <!-- Empty state -->
@@ -375,6 +490,7 @@ onMounted(async () => {
             stroke-width="1.5"
             stroke="currentColor"
             class="w-12 h-12 mx-auto text-neutral-400"
+            aria-hidden="true"
           >
             <path
               stroke-linecap="round"
@@ -382,12 +498,21 @@ onMounted(async () => {
               d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
+          <!-- A year or filter without entries is not "no entries yet". -->
           <h3 class="mt-4 text-lg font-medium text-neutral-900">
-            {{ t("hourPool.noEntries") }}
+            {{ t("hourPool.noResults") }}
           </h3>
           <p class="mt-2 text-neutral-500">
-            {{ t("hourPool.noEntriesDescription") }}
+            {{ t("hourPool.noResultsDescription") }}
           </p>
+          <button
+            v-if="hasFilters"
+            type="button"
+            class="btn-outline mx-auto mt-4"
+            @click="clearFilters"
+          >
+            {{ t("hourPool.allTypes") }} · {{ t("hourPool.allSources") }}
+          </button>
         </div>
       </div>
     </div>

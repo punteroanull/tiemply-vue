@@ -8,24 +8,28 @@ import { useAbsencesStore } from "../stores/absences";
 import { useSchedulesStore } from "../stores/schedules";
 import { useIncidentsStore } from "../stores/incidents";
 import { useAuthStore } from "../stores/auth";
-import { format, parseISO } from "date-fns";
-import { enUS, es } from "date-fns/locale";
+import { formatApiDate, formatLocalized, apiDateToYmd } from "../utils/apiDates";
+import type { WorkLogCategory } from "../types";
 import StatusBadge from '../components/StatusBadge.vue';
 import AbsenceCalendar from '../components/AbsenceCalendar.vue';
 import ScheduleBlock from '../components/ScheduleBlock.vue';
 import NightShiftIndicator from '../components/NightShiftIndicator.vue';
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 
-// Safe date formatting helper
-function formatDate(dateValue: string | undefined | null, formatStr: string): string {
-  if (!dateValue) return '-';
-  try {
-    const date = parseISO(dateValue);
-    return format(date, formatStr);
-  } catch {
-    return '-';
-  }
+// A request made from the app carries its dates in `periods`; older ones on the request.
+function requestRange(request: any): string {
+  const periods: any[] = Array.isArray(request.periods) ? request.periods : [];
+  const starts = periods.map((p) => apiDateToYmd(p.startDate)).filter(Boolean) as string[];
+  const ends = periods.map((p) => apiDateToYmd(p.endDate)).filter(Boolean) as string[];
+
+  const start = starts.length ? starts.sort()[0] : apiDateToYmd(request.startDate);
+  const end = ends.length ? ends.sort()[ends.length - 1] : apiDateToYmd(request.endDate);
+
+  if (!start) return "-";
+  const from = formatApiDate(start, "PP");
+  const to = end && end !== start ? formatApiDate(end, "PP") : "";
+  return to ? `${from} - ${to}` : from;
 }
 
 const router = useRouter();
@@ -39,20 +43,32 @@ const authStore = useAuthStore();
 const loading = ref(true);
 
 // Computed properties for user info
-const userName = computed(() => authStore.user?.name || "User");
-const dateLocale = computed(() => locale.value === "es" ? es : enUS);
-const todayDate = computed(() => format(new Date(), "EEEE, MMMM d, yyyy", { locale: dateLocale.value }));
+const userName = computed(() => authStore.user?.name || "");
+const todayDate = computed(() => formatLocalized(new Date(), "PPPP"));
 
-// Today's date formatted for API
-//const today = format(new Date(), "yyyy-MM-dd");
-//const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd')
-//const weekEnd = today
+// Worked versus expected time this week. Null when the API expects nothing (flexible
+// contracts on some periods), in which case no bar is drawn.
+const weeklyProgress = computed(() => {
+  const percent = workLogsStore.weeklyReport?.progressPercent;
+  return percent === null || percent === undefined || !Number.isFinite(percent)
+    ? null
+    : Math.max(0, Math.round(percent));
+});
+
+// A second tap while a clock action (or its location lookup) is running must do nothing.
+const actionsDisabled = computed(
+  () => workStatusStore.isBusy || workStatusStore.gettingLocation
+);
+
+function clock(category: WorkLogCategory) {
+  // Same entry point as the floating button: offline queue and end-of-shift confirmation.
+  workStatusStore.requestAction(category);
+}
 
 onMounted(async () => {
   try {
     await Promise.all([
-      workStatusStore.fetchStatus(),
-      workLogsStore.fetchDailyReport(),
+      workStatusStore.fetchStatus({ silent: true }),
       workLogsStore.fetchWeeklyReport(),
       absencesStore.fetchPendingRequests(),
       absencesStore.fetchAbsences(),
@@ -60,8 +76,8 @@ onMounted(async () => {
       schedulesStore.fetchWeeklySchedule(),
       incidentsStore.fetchIncidents({ status: 'pending' }),
     ]);
-  } catch (error) {
-    console.error("Error loading dashboard data:", error);
+  } catch {
+    // Each store reports its own failure.
   } finally {
     loading.value = false;
   }
@@ -121,20 +137,20 @@ function navigateToIncidents() {
         </div>
 
         <!-- Night Shift Info -->
-        <div v-if="workStatusStore.isNightShift && workStatusStore.shiftDate" class="mb-4 p-2 bg-purple-50 rounded-md text-sm text-purple-700">
-          {{ $t('workLog.shiftDateDifferent', { date: workStatusStore.shiftDate }) }}
+        <div v-if="workStatusStore.formattedShiftDate" class="mb-4 p-2 bg-purple-50 rounded-md text-sm text-purple-700">
+          {{ $t('workLog.shiftDateDifferent', { date: workStatusStore.formattedShiftDate }) }}
         </div>
 
         <div class="space-y-4">
           <!-- Working State -->
           <div v-if="workStatusStore.currentState === 'working'" class="flex items-center text-green-700">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
               <p class="text-sm text-neutral-600">{{ $t('dashboard.workingSince') }}</p>
               <p class="font-semibold">{{ workStatusStore.formattedLastCheckIn }}</p>
-              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-green-600 mt-1">
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-green-700 mt-1 tabular-nums">
                 {{ $t('dashboard.duration') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
@@ -142,11 +158,11 @@ function navigateToIncidents() {
 
           <!-- On Break State -->
           <div v-else-if="workStatusStore.currentState === 'on_break'" class="flex items-center text-amber-700">
-            <span class="text-2xl mr-2">☕</span>
+            <span class="text-2xl mr-2" aria-hidden="true">☕</span>
             <div>
               <p class="text-sm text-neutral-600">{{ $t('dashboard.onBreak') }}</p>
               <p class="font-semibold">{{ $t('dashboard.startedAt') }} {{ workStatusStore.formattedLastCheckOut }}</p>
-              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-amber-600 mt-1">
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-amber-700 mt-1 tabular-nums">
                 {{ $t('dashboard.breakTime') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
@@ -154,11 +170,11 @@ function navigateToIncidents() {
 
           <!-- Offsite State -->
           <div v-else-if="workStatusStore.currentState === 'offsite'" class="flex items-center text-blue-700">
-            <span class="text-2xl mr-2">🚗</span>
+            <span class="text-2xl mr-2" aria-hidden="true">🚗</span>
             <div>
               <p class="text-sm text-neutral-600">{{ $t('dashboard.offsite') }}</p>
               <p class="font-semibold">{{ $t('dashboard.leftAt') }} {{ workStatusStore.formattedLastCheckOut }}</p>
-              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-blue-600 mt-1">
+              <p v-if="workStatusStore.formattedCurrentDuration" class="text-sm text-blue-700 mt-1 tabular-nums">
                 {{ $t('dashboard.timeOffsite') }}: {{ workStatusStore.formattedCurrentDuration }}
               </p>
             </div>
@@ -166,7 +182,7 @@ function navigateToIncidents() {
 
           <!-- Not Working State -->
           <div v-else-if="workStatusStore.formattedLastCheckOut" class="flex items-center text-neutral-700">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
             </svg>
             <div>
@@ -201,29 +217,45 @@ function navigateToIncidents() {
               workLogsStore.weeklyReport.totalDuration || "0:00"
             }}</span>
           </div>
+          <div v-if="workLogsStore.weeklyReport.expectedDuration" class="flex justify-between mb-2">
+            <span class="text-neutral-600">{{ $t('dashboard.expectedHours') }}</span>
+            <span class="font-semibold">{{ workLogsStore.weeklyReport.expectedDuration }}</span>
+          </div>
           <div class="flex justify-between">
             <span class="text-neutral-600">{{ $t('dashboard.daysWorked') }}</span>
-            <span class="font-semibold"
-              >{{ workLogsStore.weeklyReport.totalDays || 0 }}/5</span
-            >
+            <span class="font-semibold">{{ workLogsStore.weeklyReport.totalDays || 0 }}</span>
           </div>
 
-          <div class="mt-4 pt-4 border-t border-neutral-200">
+          <!-- Hours worked against the hours the contract or schedule expects this week,
+               instead of assuming everyone works five days. -->
+          <div v-if="weeklyProgress !== null" class="mt-4 pt-4 border-t border-neutral-200">
             <div class="flex items-center">
-              <div class="flex-1 bg-neutral-200 rounded-full h-2">
+              <div
+                class="flex-1 bg-neutral-200 rounded-full h-2"
+                role="progressbar"
+                :aria-label="$t('dashboard.weeklyProgress')"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="Math.min(weeklyProgress, 100)"
+              >
                 <div
                   class="bg-primary-600 h-2 rounded-full"
-                  :style="`width: ${Math.min(
-                    (workLogsStore.weeklyReport.totalDays || 0) * 20,
-                    100
-                  )}%`"
+                  :style="`width: ${Math.min(weeklyProgress, 100)}%`"
                 ></div>
               </div>
-              <span class="text-sm text-neutral-600 ml-2"
-                >{{ (workLogsStore.weeklyReport.totalDays || 0) * 20 }}%</span
-              >
+              <span class="text-sm text-neutral-600 ml-2 tabular-nums">{{ weeklyProgress }}%</span>
             </div>
           </div>
+        </div>
+        <div v-else-if="workLogsStore.errors.weekly" class="text-neutral-600" role="alert">
+          <p>{{ $t('dashboard.weeklyLoadError') }}</p>
+          <button
+            type="button"
+            class="mt-2 text-sm text-primary-600 hover:text-primary-700 hover:underline"
+            @click="workLogsStore.fetchWeeklyReport()"
+          >
+            {{ $t('common.retry') }}
+          </button>
         </div>
         <div v-else class="text-neutral-600">
           <p>{{ $t('dashboard.noWorkLogs') }}</p>
@@ -311,8 +343,7 @@ function navigateToIncidents() {
                 <span class="badge-warning">{{ $t('dashboard.pending') }}</span>
               </div>
               <div class="text-sm text-neutral-600 mt-1">
-                {{ formatDate(request.startDate, "MMM d, yyyy") }} -
-                {{ formatDate(request.endDate, "MMM d, yyyy") }}
+                {{ requestRange(request) }}
               </div>
             </li>
           </ul>
@@ -392,54 +423,66 @@ function navigateToIncidents() {
           <!-- Quick Actions based on state -->
           <template v-if="workStatusStore.currentState === 'not_working'">
             <button
-              @click="workStatusStore.startShift"
-              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('shift_start')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
-              <span class="text-xl mr-2">▶️</span>
+              <span class="text-xl mr-2" aria-hidden="true">▶️</span>
               <span>{{ $t('workStatus.startYourShift') }}</span>
             </button>
           </template>
 
           <template v-else-if="workStatusStore.currentState === 'working'">
             <button
-              @click="workStatusStore.startBreak"
-              class="flex items-center p-3 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors text-amber-700"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('break_start')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-amber-50 border border-amber-200 rounded-md hover:bg-amber-100 transition-colors text-amber-700"
             >
-              <span class="text-xl mr-2">☕</span>
+              <span class="text-xl mr-2" aria-hidden="true">☕</span>
               <span>{{ $t('workStatus.takeBreak') }}</span>
             </button>
             <button
-              @click="workStatusStore.startOffsite"
-              class="flex items-center p-3 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors text-blue-700"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('offsite_start')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 transition-colors text-blue-700"
             >
-              <span class="text-xl mr-2">🚗</span>
+              <span class="text-xl mr-2" aria-hidden="true">🚗</span>
               <span>{{ $t('workStatus.goOffsiteAction') }}</span>
             </button>
             <button
-              @click="workStatusStore.endShift"
-              class="flex items-center p-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-red-700 sm:col-span-2"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('shift_end')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors text-red-700 sm:col-span-2"
             >
-              <span class="text-xl mr-2">⏹️</span>
+              <span class="text-xl mr-2" aria-hidden="true">⏹️</span>
               <span>{{ $t('workStatus.endYourShift') }}</span>
             </button>
           </template>
 
           <template v-else-if="workStatusStore.currentState === 'on_break'">
             <button
-              @click="workStatusStore.endBreak"
-              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('break_end')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
-              <span class="text-xl mr-2">↩️</span>
+              <span class="text-xl mr-2" aria-hidden="true">↩️</span>
               <span>{{ $t('workStatus.returnFromBreak') }}</span>
             </button>
           </template>
 
           <template v-else-if="workStatusStore.currentState === 'offsite'">
             <button
-              @click="workStatusStore.endOffsite"
-              class="flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
+              type="button"
+              :disabled="actionsDisabled"
+              @click="clock('offsite_end')"
+              class="disabled:opacity-50 disabled:cursor-not-allowed flex items-center p-3 bg-green-50 border border-green-200 rounded-md hover:bg-green-100 transition-colors text-green-700 sm:col-span-2"
             >
-              <span class="text-xl mr-2">🏢</span>
+              <span class="text-xl mr-2" aria-hidden="true">🏢</span>
               <span>{{ $t('workStatus.returnToOfficeAction') }}</span>
             </button>
           </template>

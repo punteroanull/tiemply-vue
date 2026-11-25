@@ -21,14 +21,25 @@ const isSubmitting = computed(() => departmentsStore.submitting);
 const loading = computed(() => departmentsStore.loading);
 const employees = computed(() => departmentsStore.employees);
 const canManage = computed(() => departmentsStore.canManageDepartment);
+const hasDepartment = computed(() => !!departmentsStore.currentDepartmentId);
 
-const isValid = computed(() => {
-  if (!selectedEmployee.value) return false;
-  if (!selectedAbsenceType.value) return false;
-  if (!absenceDate.value) return false;
-  if (isPartial.value && (!startTime.value || !endTime.value)) return false;
-  return true;
+/**
+ * What still stops the absence from being registered, as a translation key, so a disabled
+ * button never goes unexplained. Null when the form is ready.
+ */
+const blockingProblem = computed<string | null>(() => {
+  if (!selectedEmployee.value) return "department.validation.selectEmployee";
+  if (!selectedAbsenceType.value) return "newRequest.validation.selectType";
+  if (!absenceDate.value) return "department.validation.dateRequired";
+  if (isPartial.value) {
+    if (!startTime.value || !endTime.value) return "newRequest.validation.timesRequired";
+    // The API rejects an end time that is not after the start; say so before sending.
+    if (endTime.value <= startTime.value) return "newRequest.validation.endTimeBeforeStart";
+  }
+  return null;
 });
+
+const isValid = computed(() => blockingProblem.value === null);
 
 async function handleSubmit() {
   if (!isValid.value) return;
@@ -59,11 +70,12 @@ onMounted(async () => {
     router.push("/department");
     return;
   }
+  if (!hasDepartment.value) return;
 
-  await departmentsStore.fetchEmployees();
-  if (absencesStore.absenceTypes.length === 0) {
-    await absencesStore.fetchAbsenceTypes();
-  }
+  await Promise.all([
+    departmentsStore.fetchEmployees(),
+    absencesStore.absenceTypes.length === 0 ? absencesStore.fetchAbsenceTypes() : Promise.resolve(),
+  ]);
 });
 </script>
 
@@ -71,10 +83,11 @@ onMounted(async () => {
   <div class="container mx-auto px-4 py-4">
     <div class="mb-6">
       <button
+        type="button"
         @click="goBack"
         class="flex items-center text-neutral-600 hover:text-neutral-800 mb-4"
       >
-        <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+        <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -91,23 +104,33 @@ onMounted(async () => {
       </p>
     </div>
 
+    <!-- Not in a department: there is nobody to register an absence for -->
+    <div v-if="!hasDepartment" class="bg-white rounded-lg shadow p-8 text-center max-w-2xl">
+      <h3 class="text-lg font-medium text-neutral-800 mb-2">
+        {{ $t("department.noDepartment") }}
+      </h3>
+      <p class="text-neutral-600">{{ $t("department.noDepartmentDescription") }}</p>
+    </div>
+
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center items-center h-64">
+    <div v-else-if="loading" class="flex justify-center items-center h-64" role="status">
       <div
         class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"
       ></div>
+      <span class="sr-only">{{ $t("common.loading") }}</span>
     </div>
 
     <!-- Form -->
     <div v-else class="bg-white rounded-lg shadow p-6 max-w-2xl">
-      <form @submit.prevent="handleSubmit" class="space-y-6">
+      <form @submit.prevent="handleSubmit" class="space-y-6" novalidate>
         <!-- Employee Select -->
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="new-absence-employee" class="block text-sm font-medium text-neutral-700 mb-1">
             {{ $t("department.employee") }}
-            <span class="text-red-500">*</span>
+            <span class="text-red-500" aria-hidden="true">*</span>
           </label>
           <select
+            id="new-absence-employee"
             v-model="selectedEmployee"
             required
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -116,18 +139,19 @@ onMounted(async () => {
               {{ $t("department.selectEmployee") }}
             </option>
             <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-              {{ emp.user?.name || emp.id }}
+              {{ emp.user?.name || $t("common.unknown") }}
             </option>
           </select>
         </div>
 
         <!-- Absence Type -->
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="new-absence-type" class="block text-sm font-medium text-neutral-700 mb-1">
             {{ $t("newRequest.absenceType") }}
-            <span class="text-red-500">*</span>
+            <span class="text-red-500" aria-hidden="true">*</span>
           </label>
           <select
+            id="new-absence-type"
             v-model="selectedAbsenceType"
             required
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -145,11 +169,12 @@ onMounted(async () => {
 
         <!-- Date -->
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="new-absence-date" class="block text-sm font-medium text-neutral-700 mb-1">
             {{ $t("workLogs.date") }}
-            <span class="text-red-500">*</span>
+            <span class="text-red-500" aria-hidden="true">*</span>
           </label>
           <input
+            id="new-absence-date"
             type="date"
             v-model="absenceDate"
             required
@@ -177,14 +202,15 @@ onMounted(async () => {
         <!-- Time Range (if partial) -->
         <div
           v-if="isPartial"
-          class="grid grid-cols-2 gap-4 pl-6 border-l-2 border-primary-200"
+          class="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6 border-l-2 border-primary-200"
         >
           <div>
-            <label class="block text-sm font-medium text-neutral-700 mb-1">
+            <label for="new-absence-start-time" class="block text-sm font-medium text-neutral-700 mb-1">
               {{ $t("newRequest.startTime") }}
-              <span class="text-red-500">*</span>
+              <span class="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
+              id="new-absence-start-time"
               type="time"
               v-model="startTime"
               required
@@ -192,12 +218,14 @@ onMounted(async () => {
             />
           </div>
           <div>
-            <label class="block text-sm font-medium text-neutral-700 mb-1">
+            <label for="new-absence-end-time" class="block text-sm font-medium text-neutral-700 mb-1">
               {{ $t("newRequest.endTime") }}
-              <span class="text-red-500">*</span>
+              <span class="text-red-500" aria-hidden="true">*</span>
             </label>
             <input
+              id="new-absence-end-time"
               type="time"
+              :min="startTime || undefined"
               v-model="endTime"
               required
               class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -207,10 +235,11 @@ onMounted(async () => {
 
         <!-- Notes -->
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="new-absence-notes" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("newRequest.notes")
           }}</label>
           <textarea
+            id="new-absence-notes"
             v-model="notes"
             rows="3"
             maxlength="500"
@@ -223,10 +252,14 @@ onMounted(async () => {
         </div>
 
         <!-- Submit -->
-        <div class="flex gap-3 pt-4 border-t">
+        <p v-if="blockingProblem" id="new-absence-problem" class="text-sm text-neutral-600" role="status">
+          {{ $t(blockingProblem) }}
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3 pt-4 border-t">
           <button
             type="submit"
             :disabled="!isValid || isSubmitting"
+            :aria-describedby="blockingProblem ? 'new-absence-problem' : undefined"
             class="flex-1 px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <span v-if="isSubmitting" class="flex items-center justify-center">
@@ -234,6 +267,7 @@ onMounted(async () => {
                 class="animate-spin -ml-1 mr-2 h-4 w-4"
                 fill="none"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <circle
                   class="opacity-25"

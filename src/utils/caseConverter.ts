@@ -9,7 +9,8 @@
  * @returns The camelCase version of the string
  */
 export function snakeToCamelCase(str: string): string {
-  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+  // Digits too: "address_line_1" used to come out half converted, as "addressLine_1".
+  return str.replace(/_([a-z0-9])/g, (_, char) => char.toUpperCase());
 }
 
 /**

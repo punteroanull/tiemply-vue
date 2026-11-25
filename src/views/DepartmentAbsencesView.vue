@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useDepartmentsStore } from "../stores/departments";
 import { useAbsencesStore } from "../stores/absences";
-import { format, parseISO, subMonths } from "date-fns";
-import { enUS, es } from "date-fns/locale";
+import ErrorState from "../components/ErrorState.vue";
+import { addMonths, format, subMonths } from "date-fns";
+import { formatApiDate, formatClockTime } from "../utils/apiDates";
 
-const { locale } = useI18n();
+const { t } = useI18n();
 const router = useRouter();
 const departmentsStore = useDepartmentsStore();
 const absencesStore = useAbsencesStore();
@@ -16,14 +17,19 @@ const loading = computed(() => departmentsStore.loading);
 const absences = computed(() => departmentsStore.absences);
 const employees = computed(() => departmentsStore.employees);
 const canManage = computed(() => departmentsStore.canManageDepartment);
+const hasDepartment = computed(() => !!departmentsStore.currentDepartmentId);
 
-// Filters
+// Filters. Employee and type filter what is on screen; the dates decide what the server
+// returns, so changing one reloads the list. The window looks ahead too: an absence
+// registered for tomorrow has to show up after registering it.
 const selectedEmployee = ref("all");
 const selectedType = ref("all");
 const startDate = ref(format(subMonths(new Date(), 1), "yyyy-MM-dd"));
-const endDate = ref(format(new Date(), "yyyy-MM-dd"));
+const endDate = ref(format(addMonths(new Date(), 3), "yyyy-MM-dd"));
 
-const dateLocale = computed(() => (locale.value === "es" ? es : enUS));
+const invalidRange = computed(
+  () => !!startDate.value && !!endDate.value && startDate.value > endDate.value
+);
 
 // Filtered absences
 const filteredAbsences = computed(() => {
@@ -35,20 +41,20 @@ const filteredAbsences = computed(() => {
       selectedType.value === "all" ||
       absence.absenceType?.id === selectedType.value;
 
-    const absenceDate = parseISO(absence.date);
-    const isAfterStart = parseISO(startDate.value) <= absenceDate;
-    const isBeforeEnd = parseISO(endDate.value) >= absenceDate;
-
-    return matchesEmployee && matchesType && isAfterStart && isBeforeEnd;
+    return matchesEmployee && matchesType;
   });
 });
 
 function formatDate(dateStr: string) {
-  try {
-    return format(parseISO(dateStr), "MMM d, yyyy", { locale: dateLocale.value });
-  } catch {
-    return dateStr;
+  return formatApiDate(dateStr) || "-";
+}
+
+function formatDuration(absence: { isPartial: boolean; startTime?: string; endTime?: string }) {
+  if (!absence.isPartial) return t("absences.fullDay");
+  if (absence.startTime && absence.endTime) {
+    return `${formatClockTime(absence.startTime)} - ${formatClockTime(absence.endTime)}`;
   }
+  return t("absences.partialDay");
 }
 
 function getAbsenceTypeClass(code: string | undefined) {
@@ -68,7 +74,7 @@ function getAbsenceTypeClass(code: string | undefined) {
 }
 
 function getEmployeeName(absence: any): string {
-  return absence.employee?.user?.name || absence.employee?.name || "Unknown";
+  return absence.employee?.user?.name || absence.employee?.name || t("common.unknown");
 }
 
 function goBack() {
@@ -79,29 +85,29 @@ function navigateToNewAbsence() {
   router.push("/department/absences/new");
 }
 
-async function applyFilters() {
+async function loadAbsences() {
+  if (invalidRange.value) return;
   await departmentsStore.fetchDepartmentAbsences(
     undefined,
-    startDate.value,
-    endDate.value
+    startDate.value || undefined,
+    endDate.value || undefined
   );
 }
+
+watch([startDate, endDate], loadAbsences);
 
 onMounted(async () => {
   if (!canManage.value) {
     router.push("/department");
     return;
   }
+  if (!hasDepartment.value) return;
 
-  await departmentsStore.fetchDepartmentAbsences(
-    undefined,
-    startDate.value,
-    endDate.value
-  );
-  await departmentsStore.fetchEmployees();
-  if (absencesStore.absenceTypes.length === 0) {
-    await absencesStore.fetchAbsenceTypes();
-  }
+  await Promise.all([
+    loadAbsences(),
+    departmentsStore.fetchEmployees(),
+    absencesStore.absenceTypes.length === 0 ? absencesStore.fetchAbsenceTypes() : Promise.resolve(),
+  ]);
 });
 </script>
 
@@ -113,10 +119,11 @@ onMounted(async () => {
     >
       <div>
         <button
+          type="button"
           @click="goBack"
           class="flex items-center text-neutral-600 hover:text-neutral-800 mb-2"
         >
-          <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+          <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path
               fill-rule="evenodd"
               d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -134,10 +141,12 @@ onMounted(async () => {
       </div>
 
       <button
+        v-if="hasDepartment"
+        type="button"
         @click="navigateToNewAbsence"
-        class="flex items-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors"
+        class="btn-primary"
       >
-        <svg class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <svg class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
             d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
@@ -148,28 +157,39 @@ onMounted(async () => {
       </button>
     </div>
 
+    <!-- Not in a department: there is nothing to list, and silence would look like "no absences" -->
+    <div v-if="!hasDepartment" class="bg-white rounded-lg shadow p-8 text-center">
+      <h3 class="text-lg font-medium text-neutral-800 mb-2">
+        {{ $t("department.noDepartment") }}
+      </h3>
+      <p class="text-neutral-600">{{ $t("department.noDepartmentDescription") }}</p>
+    </div>
+
+    <template v-else>
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dept-absences-employee" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("department.employee")
           }}</label>
           <select
+            id="dept-absences-employee"
             v-model="selectedEmployee"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="all">{{ $t("department.allEmployees") }}</option>
             <option v-for="emp in employees" :key="emp.id" :value="emp.id">
-              {{ emp.user?.name || emp.id }}
+              {{ emp.user?.name || $t("common.unknown") }}
             </option>
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dept-absences-type" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("absences.absenceType")
           }}</label>
           <select
+            id="dept-absences-type"
             v-model="selectedType"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
@@ -184,42 +204,47 @@ onMounted(async () => {
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dept-absences-from" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("absences.from")
           }}</label>
           <input
+            id="dept-absences-from"
             type="date"
             v-model="startDate"
+            :max="endDate || undefined"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dept-absences-to" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("absences.to")
           }}</label>
           <input
+            id="dept-absences-to"
             type="date"
             v-model="endDate"
-            class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :min="startDate || undefined"
+            :aria-invalid="invalidRange ? 'true' : undefined"
+            class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            :class="invalidRange ? 'border-red-400' : 'border-neutral-300'"
           />
         </div>
-        <div class="flex items-end">
-          <button
-            @click="applyFilters"
-            class="w-full px-4 py-2 bg-neutral-100 text-neutral-700 font-medium rounded-md hover:bg-neutral-200 transition-colors"
-          >
-            {{ locale === "es" ? "Aplicar" : "Apply" }}
-          </button>
-        </div>
       </div>
+      <p v-if="invalidRange" class="mt-2 text-sm text-red-600" role="alert">
+        {{ $t("newRequest.validation.endBeforeStart") }}
+      </p>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center items-center h-64">
+    <div v-if="loading" class="flex justify-center items-center h-64" role="status">
       <div
         class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"
       ></div>
+      <span class="sr-only">{{ $t("common.loading") }}</span>
     </div>
+
+    <!-- Error state: a failed load is not "no absences" -->
+    <ErrorState v-else-if="departmentsStore.absencesError" @retry="loadAbsences" />
 
     <!-- Empty state -->
     <div
@@ -229,7 +254,7 @@ onMounted(async () => {
       <div
         class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-neutral-100 text-neutral-500 mb-4"
       >
-        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -253,26 +278,31 @@ onMounted(async () => {
           <thead class="bg-neutral-50">
             <tr>
               <th
+                scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase"
               >
                 {{ $t("department.employee") }}
               </th>
               <th
+                scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase"
               >
                 {{ $t("workLogs.date") }}
               </th>
               <th
+                scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase"
               >
                 {{ $t("requests.type") }}
               </th>
               <th
+                scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase"
               >
                 {{ $t("absences.duration") }}
               </th>
               <th
+                scope="col"
                 class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase"
               >
                 {{ $t("workLogs.notes") }}
@@ -288,6 +318,7 @@ onMounted(async () => {
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex items-center">
                   <div
+                    aria-hidden="true"
                     class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm"
                   >
                     {{ getEmployeeName(absence).charAt(0).toUpperCase() }}
@@ -309,11 +340,7 @@ onMounted(async () => {
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                {{
-                  absence.isPartial
-                    ? $t("absences.partialDay")
-                    : $t("absences.fullDay")
-                }}
+                {{ formatDuration(absence) }}
               </td>
               <td class="px-6 py-4 text-sm text-neutral-600 max-w-xs truncate">
                 {{ absence.notes || "-" }}
@@ -333,6 +360,7 @@ onMounted(async () => {
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center">
               <div
+                aria-hidden="true"
                 class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm"
               >
                 {{ getEmployeeName(absence).charAt(0).toUpperCase() }}
@@ -350,19 +378,14 @@ onMounted(async () => {
           </div>
           <div class="text-sm text-neutral-600">
             <p>{{ formatDate(absence.date) }}</p>
-            <p>
-              {{
-                absence.isPartial
-                  ? $t("absences.partialDay")
-                  : $t("absences.fullDay")
-              }}
-            </p>
-            <p v-if="absence.notes" class="mt-1 text-neutral-500 truncate">
+            <p>{{ formatDuration(absence) }}</p>
+            <p v-if="absence.notes" class="mt-1 text-neutral-500 break-words">
               {{ absence.notes }}
             </p>
           </div>
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

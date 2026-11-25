@@ -1,8 +1,10 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import api from "../services/api";
+import i18n from "../i18n";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "./auth";
+import { apiErrorMessage, unwrap, unwrapList } from "../utils/apiResponse";
 
 interface Department {
   id: string;
@@ -105,16 +107,32 @@ interface DepartmentAbsence {
   };
 }
 
+interface DepartmentRequestPeriod {
+  id: string;
+  startDate: string;
+  endDate: string;
+  isPartial: boolean;
+  startTime?: string;
+  endTime?: string;
+  status: "pending" | "approved" | "rejected";
+  daysCount: number;
+  rejectionReason?: string;
+}
+
 interface DepartmentRequest {
   id: string;
   employeeId: string;
   absenceTypeId: string;
-  startDate: string;
-  endDate: string;
+  // Null on period-based requests, which carry their dates in `periods` instead.
+  startDate: string | null;
+  endDate: string | null;
   daysCount: number;
   isPartial: boolean;
-  status: "pending" | "approved" | "rejected";
+  usesPeriods?: boolean;
+  periods?: DepartmentRequestPeriod[];
+  status: "pending" | "approved" | "rejected" | "partial";
   notes?: string;
+  rejectionReason?: string;
   employee?: {
     id: string;
     user?: {
@@ -175,6 +193,7 @@ interface CreateAbsenceData {
 export const useDepartmentsStore = defineStore("departments", () => {
   const toast = useToast();
   const authStore = useAuthStore();
+  const t = i18n.global.t;
 
   // State
   const department = ref<Department | null>(null);
@@ -185,7 +204,35 @@ export const useDepartmentsStore = defineStore("departments", () => {
   const workLogs = ref<DepartmentWorkLog[]>([]);
 
   const loading = ref(false);
+  const calendarLoading = ref(false);
   const submitting = ref(false);
+
+  // A failed fetch must not look like "there is nothing": views show a retry instead.
+  const departmentError = ref(false);
+  const absencesError = ref(false);
+  const requestsError = ref(false);
+  const workLogsError = ref(false);
+
+  /** False once the API refuses the team calendar (not allowed, or not in the plan). */
+  const calendarAvailable = ref(true);
+
+  // Several fetches overlap (the layout loads the department while a view loads its
+  // list), so `loading` only clears when the last one finishes.
+  let pendingFetches = 0;
+
+  async function tracked<T>(work: () => Promise<T>): Promise<T> {
+    pendingFetches++;
+    loading.value = true;
+    try {
+      return await work();
+    } finally {
+      pendingFetches--;
+      if (pendingFetches === 0) loading.value = false;
+    }
+  }
+
+  // Filters fire requests in quick succession; only the answer to the latest one counts.
+  const latest = { absences: 0, requests: 0, workLogs: 0, calendar: 0 };
 
   // Computed: Department ID del empleado actual
   const currentDepartmentId = computed(() => {
@@ -198,9 +245,17 @@ export const useDepartmentsStore = defineStore("departments", () => {
     return department.value.supervisorId === authStore.currentEmployee.id;
   });
 
-  // Computed: Puede gestionar departamento (supervisor, manager o admin)
+  // Computed: Puede gestionar departamento (supervisor, manager o admin).
+  // `authStore.isSupervisor` comes from /me and is known before the department has been
+  // fetched; relying on the fetched department alone bounced supervisors off the
+  // department pages on reload.
   const canManageDepartment = computed(() => {
-    return isSupervisor.value || authStore.isManager || authStore.isAdmin;
+    return (
+      isSupervisor.value ||
+      authStore.isSupervisor ||
+      authStore.isManager ||
+      authStore.isAdmin
+    );
   });
 
   // Computed: Días del calendario
@@ -208,63 +263,85 @@ export const useDepartmentsStore = defineStore("departments", () => {
     return calendarData.value?.calendar || [];
   });
 
-  // Helper para extraer datos de respuesta API
-  function extractData<T>(response: any): T {
-    if (response.data && typeof response.data === "object" && "data" in response.data) {
-      return response.data.data;
-    }
-    return response.data;
-  }
-
   // ===== MÉTODOS PARA TODOS LOS EMPLEADOS =====
 
   async function fetchDepartment(departmentId?: string) {
     const deptId = departmentId || currentDepartmentId.value;
     if (!deptId) return;
 
-    loading.value = true;
-    try {
-      const response = await api.get(`/departments/${deptId}`);
-      department.value = extractData<Department>(response);
-    } catch (error: any) {
-      console.error("Error fetching department:", error);
-      toast.error(error.response?.data?.message || "Failed to load department");
-    } finally {
-      loading.value = false;
-    }
+    return tracked(async () => {
+      try {
+        const response = await api.get(`/departments/${deptId}`);
+        department.value = unwrap<Department>(response);
+        departmentError.value = false;
+      } catch (error) {
+        departmentError.value = true;
+        toast.error(apiErrorMessage(error, t("department.errors.fetchDepartment")));
+      }
+    });
   }
 
+  /**
+   * Members of the department. The dedicated endpoint (which also says who clocked in
+   * today) is only open to whoever manages the department; everyone else gets the member
+   * list that already comes with the department itself.
+   */
   async function fetchEmployees(departmentId?: string) {
     const deptId = departmentId || currentDepartmentId.value;
     if (!deptId) return;
 
-    loading.value = true;
-    try {
-      const response = await api.get(`/departments/${deptId}/employees`);
-      employees.value = extractData<DepartmentEmployee[]>(response);
-    } catch (error: any) {
-      console.error("Error fetching employees:", error);
-      toast.error(error.response?.data?.message || "Failed to load employees");
-    } finally {
-      loading.value = false;
+    if (!canManageDepartment.value) {
+      if (!department.value) await fetchDepartment(deptId);
+      employees.value = department.value?.employees ?? [];
+      return;
     }
+
+    return tracked(async () => {
+      try {
+        const response = await api.get(`/departments/${deptId}/employees`);
+        employees.value = unwrapList<DepartmentEmployee>(response);
+      } catch (error: any) {
+        if (error?.response?.status === 403) {
+          // Manages another department, not this one: fall back to the plain list.
+          employees.value = department.value?.employees ?? [];
+          return;
+        }
+        toast.error(apiErrorMessage(error, t("department.errors.fetchEmployees")));
+      }
+    });
   }
 
+  /**
+   * Team absence calendar. Only for whoever manages the department, and only on plans
+   * that include it: a 403 just means "no calendar here", not an error to shout about.
+   * It has its own loading flag so changing month does not blank the whole page.
+   */
   async function fetchCalendar(year: number, month: number, departmentId?: string) {
     const deptId = departmentId || currentDepartmentId.value;
-    if (!deptId) return;
+    if (!deptId || !canManageDepartment.value) {
+      calendarData.value = null;
+      return;
+    }
 
-    loading.value = true;
+    const requestId = ++latest.calendar;
+    calendarLoading.value = true;
     try {
-      const response = await api.get(
-        `/departments/${deptId}/calendar?year=${year}&month=${month}`
-      );
-      calendarData.value = extractData<CalendarResponse>(response);
+      const response = await api.get(`/departments/${deptId}/calendar`, {
+        params: { year, month },
+      });
+      if (requestId !== latest.calendar) return;
+      calendarData.value = unwrap<CalendarResponse>(response);
+      calendarAvailable.value = true;
     } catch (error: any) {
-      console.error("Error fetching calendar:", error);
-      toast.error(error.response?.data?.message || "Failed to load calendar");
+      if (requestId !== latest.calendar) return;
+      calendarData.value = null;
+      if (error?.response?.status === 403) {
+        calendarAvailable.value = false;
+        return;
+      }
+      toast.error(apiErrorMessage(error, t("department.errors.fetchCalendar")));
     } finally {
-      loading.value = false;
+      if (requestId === latest.calendar) calendarLoading.value = false;
     }
   }
 
@@ -278,22 +355,24 @@ export const useDepartmentsStore = defineStore("departments", () => {
     const deptId = departmentId || currentDepartmentId.value;
     if (!deptId) return;
 
-    loading.value = true;
-    try {
-      let url = `/departments/${deptId}/absences`;
-      const params = new URLSearchParams();
-      if (startDate) params.append("start_date", startDate);
-      if (endDate) params.append("end_date", endDate);
-      if (params.toString()) url += `?${params.toString()}`;
+    const requestId = ++latest.absences;
+    return tracked(async () => {
+      try {
+        const params: Record<string, string> = {};
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
 
-      const response = await api.get(url);
-      absences.value = extractData<DepartmentAbsence[]>(response);
-    } catch (error: any) {
-      console.error("Error fetching department absences:", error);
-      toast.error(error.response?.data?.message || "Failed to load absences");
-    } finally {
-      loading.value = false;
-    }
+        const response = await api.get(`/departments/${deptId}/absences`, { params });
+        if (requestId !== latest.absences) return;
+        absences.value = unwrapList<DepartmentAbsence>(response);
+        absencesError.value = false;
+      } catch (error) {
+        if (requestId !== latest.absences) return;
+        absences.value = [];
+        absencesError.value = true;
+        toast.error(apiErrorMessage(error, t("department.errors.fetchAbsences")));
+      }
+    });
   }
 
   async function fetchDepartmentRequests(
@@ -303,19 +382,24 @@ export const useDepartmentsStore = defineStore("departments", () => {
     const deptId = departmentId || currentDepartmentId.value;
     if (!deptId) return;
 
-    loading.value = true;
-    try {
-      let url = `/departments/${deptId}/absence-requests`;
-      if (status && status !== "all") url += `?status=${status}`;
+    const requestId = ++latest.requests;
+    return tracked(async () => {
+      try {
+        // The API filters by pending, approved or rejected only.
+        const filterable = ["pending", "approved", "rejected"];
+        const params = status && filterable.includes(status) ? { status } : {};
 
-      const response = await api.get(url);
-      requests.value = extractData<DepartmentRequest[]>(response);
-    } catch (error: any) {
-      console.error("Error fetching department requests:", error);
-      toast.error(error.response?.data?.message || "Failed to load requests");
-    } finally {
-      loading.value = false;
-    }
+        const response = await api.get(`/departments/${deptId}/absence-requests`, { params });
+        if (requestId !== latest.requests) return;
+        requests.value = unwrapList<DepartmentRequest>(response);
+        requestsError.value = false;
+      } catch (error) {
+        if (requestId !== latest.requests) return;
+        requests.value = [];
+        requestsError.value = true;
+        toast.error(apiErrorMessage(error, t("department.errors.fetchRequests")));
+      }
+    });
   }
 
   async function fetchDepartmentWorkLogs(
@@ -326,22 +410,24 @@ export const useDepartmentsStore = defineStore("departments", () => {
     const deptId = departmentId || currentDepartmentId.value;
     if (!deptId) return;
 
-    loading.value = true;
-    try {
-      let url = `/departments/${deptId}/work-logs`;
-      const params = new URLSearchParams();
-      if (startDate) params.append("start_date", startDate);
-      if (endDate) params.append("end_date", endDate);
-      if (params.toString()) url += `?${params.toString()}`;
+    const requestId = ++latest.workLogs;
+    return tracked(async () => {
+      try {
+        const params: Record<string, string> = {};
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
 
-      const response = await api.get(url);
-      workLogs.value = extractData<DepartmentWorkLog[]>(response);
-    } catch (error: any) {
-      console.error("Error fetching department work logs:", error);
-      toast.error(error.response?.data?.message || "Failed to load work logs");
-    } finally {
-      loading.value = false;
-    }
+        const response = await api.get(`/departments/${deptId}/work-logs`, { params });
+        if (requestId !== latest.workLogs) return;
+        workLogs.value = unwrapList<DepartmentWorkLog>(response);
+        workLogsError.value = false;
+      } catch (error) {
+        if (requestId !== latest.workLogs) return;
+        workLogs.value = [];
+        workLogsError.value = true;
+        toast.error(apiErrorMessage(error, t("department.errors.fetchWorkLogs")));
+      }
+    });
   }
 
   async function createDirectAbsence(
@@ -349,16 +435,18 @@ export const useDepartmentsStore = defineStore("departments", () => {
     departmentId?: string
   ): Promise<boolean> {
     const deptId = departmentId || currentDepartmentId.value;
-    if (!deptId) return false;
+    if (!deptId) {
+      toast.error(t("department.noDepartment"));
+      return false;
+    }
 
     submitting.value = true;
     try {
       await api.post(`/departments/${deptId}/absences`, data);
-      toast.success("Absence registered successfully");
+      toast.success(t("department.absenceCreated"));
       return true;
-    } catch (error: any) {
-      console.error("Error creating absence:", error);
-      toast.error(error.response?.data?.message || "Failed to register absence");
+    } catch (error) {
+      toast.error(apiErrorMessage(error, t("department.absenceCreateError")));
       return false;
     } finally {
       submitting.value = false;
@@ -373,6 +461,11 @@ export const useDepartmentsStore = defineStore("departments", () => {
     absences.value = [];
     requests.value = [];
     workLogs.value = [];
+    departmentError.value = false;
+    absencesError.value = false;
+    requestsError.value = false;
+    workLogsError.value = false;
+    calendarAvailable.value = true;
   }
 
   return {
@@ -385,7 +478,13 @@ export const useDepartmentsStore = defineStore("departments", () => {
     requests,
     workLogs,
     loading,
+    calendarLoading,
     submitting,
+    departmentError,
+    absencesError,
+    requestsError,
+    workLogsError,
+    calendarAvailable,
 
     // Computed
     currentDepartmentId,

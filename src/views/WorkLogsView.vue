@@ -2,23 +2,28 @@
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useWorkLogsStore } from "../stores/workLogs";
+import { useAuthStore } from "../stores/auth";
 import SourceBadge from "../components/SourceBadge.vue";
+import ErrorState from "../components/ErrorState.vue";
 import {
-  parse,
   format,
-  parseISO,
-  subDays,
-  subWeeks,
-  subMonths,
+  addDays,
+  addWeeks,
+  addMonths,
   startOfWeek,
   endOfWeek,
+  startOfMonth,
+  startOfDay,
 } from "date-fns";
-import { enUS, es } from "date-fns/locale";
+import { formatApiDate, formatClockTime, formatLocalized } from "../utils/apiDates";
 
-const { locale } = useI18n();
+type Tab = "daily" | "weekly" | "monthly";
+
+const { t, te } = useI18n();
 
 const workLogsStore = useWorkLogsStore();
-const activeTab = ref("daily");
+const authStore = useAuthStore();
+const activeTab = ref<Tab>("daily");
 
 const isLoading = computed(() => workLogsStore.loading);
 const isExporting = computed(() => workLogsStore.exporting);
@@ -28,29 +33,27 @@ const selectedDate = ref(new Date());
 const selectedWeek = ref(new Date());
 const selectedMonth = ref(new Date());
 
-// Date locale
-const dateLocale = computed(() => locale.value === "es" ? es : enUS);
-
-// Format date for display
-const formattedSelectedDate = computed(() =>
-  format(selectedDate.value, "MMMM d, yyyy", { locale: dateLocale.value })
-);
+// Format date for display, in the app language
+const formattedSelectedDate = computed(() => formatLocalized(selectedDate.value, "PPP"));
 const formattedSelectedWeek = computed(() => {
   const start = startOfWeek(selectedWeek.value, { weekStartsOn: 1 });
   const end = endOfWeek(selectedWeek.value, { weekStartsOn: 1 });
-  return `${format(start, "MMM d", { locale: dateLocale.value })} - ${format(end, "MMM d, yyyy", { locale: dateLocale.value })}`;
+  return `${formatLocalized(start, "d MMM")} - ${formatLocalized(end, "PP")}`;
 });
-const formattedSelectedMonth = computed(() =>
-  format(selectedMonth.value, "MMMM yyyy", { locale: dateLocale.value })
+const formattedSelectedMonth = computed(() => formatLocalized(selectedMonth.value, "LLLL yyyy"));
+
+const periodTitle = computed(() =>
+  activeTab.value === "daily"
+    ? formattedSelectedDate.value
+    : activeTab.value === "weekly"
+    ? formattedSelectedWeek.value
+    : formattedSelectedMonth.value
 );
 
 // Format date for API
 const dateForApi = computed(() => format(selectedDate.value, "yyyy-MM-dd"));
 const weekStartForApi = computed(() =>
   format(startOfWeek(selectedWeek.value, { weekStartsOn: 1 }), "yyyy-MM-dd")
-);
-const weekEndForApi = computed(() =>
-  format(endOfWeek(selectedWeek.value, { weekStartsOn: 1 }), "yyyy-MM-dd")
 );
 const monthForApi = computed(() => format(selectedMonth.value, "yyyy-MM"));
 
@@ -68,56 +71,97 @@ const activeReport = computed(() => {
   }
 });
 
-// Functions to navigate between dates
-function previousDay() {
-  selectedDate.value = subDays(selectedDate.value, 1);
+const hasError = computed(() => workLogsStore.errors[activeTab.value]);
+
+// The weekly and monthly reports always list every day of the period, so "has rows" says
+// nothing: what matters is whether anything was recorded.
+const isEmpty = computed(() => !activeReport.value || !activeReport.value.hasLogs);
+
+// There is nothing to show after the current day, week or month.
+const isCurrentPeriod = computed(() => {
+  const now = new Date();
+  if (activeTab.value === "daily") {
+    return startOfDay(selectedDate.value) >= startOfDay(now);
+  }
+  if (activeTab.value === "weekly") {
+    return (
+      startOfWeek(selectedWeek.value, { weekStartsOn: 1 }) >=
+      startOfWeek(now, { weekStartsOn: 1 })
+    );
+  }
+  return startOfMonth(selectedMonth.value) >= startOfMonth(now);
+});
+
+const currentPeriodLabel = computed(() =>
+  activeTab.value === "daily"
+    ? t("workLogs.today")
+    : activeTab.value === "weekly"
+    ? t("workLogs.thisWeek")
+    : t("workLogs.thisMonth")
+);
+
+function shiftPeriod(direction: 1 | -1) {
+  if (direction === 1 && isCurrentPeriod.value) return;
+
+  if (activeTab.value === "daily") {
+    selectedDate.value = addDays(selectedDate.value, direction);
+  } else if (activeTab.value === "weekly") {
+    selectedWeek.value = addWeeks(selectedWeek.value, direction);
+  } else {
+    selectedMonth.value = addMonths(selectedMonth.value, direction);
+  }
 }
 
-function nextDay() {
-  selectedDate.value = subDays(selectedDate.value, -1);
+function goToCurrentPeriod() {
+  if (activeTab.value === "daily") {
+    selectedDate.value = new Date();
+  } else if (activeTab.value === "weekly") {
+    selectedWeek.value = new Date();
+  } else {
+    selectedMonth.value = new Date();
+  }
 }
 
-function previousWeek() {
-  selectedWeek.value = subWeeks(selectedWeek.value, 1);
+// Jump straight to a date instead of stepping one period at a time.
+const todayForInput = computed(() => format(new Date(), "yyyy-MM-dd"));
+const pickerValue = computed(() =>
+  activeTab.value === "monthly"
+    ? monthForApi.value
+    : format(activeTab.value === "daily" ? selectedDate.value : selectedWeek.value, "yyyy-MM-dd")
+);
+
+function onPickDate(event: Event) {
+  const value = (event.target as HTMLInputElement).value;
+  if (!value) return;
+
+  const [year, month, day] = value.split("-").map(Number);
+  const picked = new Date(year, month - 1, day || 1);
+  if (isNaN(picked.getTime()) || picked > new Date()) return;
+
+  if (activeTab.value === "daily") {
+    selectedDate.value = picked;
+  } else if (activeTab.value === "weekly") {
+    selectedWeek.value = picked;
+  } else {
+    selectedMonth.value = picked;
+  }
 }
 
-function nextWeek() {
-  selectedWeek.value = subWeeks(selectedWeek.value, -1);
-}
-
-function previousMonth() {
-  selectedMonth.value = subMonths(selectedMonth.value, 1);
-}
-
-function nextMonth() {
-  selectedMonth.value = subMonths(selectedMonth.value, -1);
-}
-
-function setToday() {
-  selectedDate.value = new Date();
-}
-
-function setThisWeek() {
-  selectedWeek.value = new Date();
-}
-
-function setThisMonth() {
-  selectedMonth.value = new Date();
+function loadActiveReport() {
+  if (activeTab.value === "daily") {
+    return workLogsStore.fetchDailyReport(dateForApi.value);
+  }
+  if (activeTab.value === "weekly") {
+    return workLogsStore.fetchWeeklyReport(weekStartForApi.value);
+  }
+  const [year, month] = monthForApi.value.split("-");
+  return workLogsStore.fetchMonthlyReport(parseInt(year), parseInt(month));
 }
 
 // Tab changing function
-function changeTab(tab: string) {
+function changeTab(tab: Tab) {
   activeTab.value = tab;
-
-  // Load the appropriate report data
-  if (tab === "daily") {
-    workLogsStore.fetchDailyReport(dateForApi.value);
-  } else if (tab === "weekly") {
-    workLogsStore.fetchWeeklyReport(`${weekStartForApi.value}`);
-  } else if (tab === "monthly") {
-    const [year, month] = monthForApi.value.split("-");
-    workLogsStore.fetchMonthlyReport(parseInt(year), parseInt(month));
-  }
+  loadActiveReport();
 }
 
 // Export PDF function
@@ -132,46 +176,26 @@ async function exportPdf() {
   }
 }
 
-// Watch for changes in selected dates and reload data
-watch(
-  () => dateForApi.value,
-  (newDate) => {
-    if (activeTab.value === "daily") {
-      workLogsStore.fetchDailyReport(newDate);
-    }
-  }
-);
+// Reload when the selected period changes
+watch([dateForApi, weekStartForApi, monthForApi], loadActiveReport);
 
-watch([() => weekStartForApi.value, () => weekEndForApi.value], () => {
-  if (activeTab.value === "weekly") {
-    workLogsStore.fetchWeeklyReport(`${weekStartForApi.value}`);
-  }
-});
+// 24-hour clock, as the rest of the app
+function formatTime(timeString: string | undefined | null) {
+  return formatClockTime(timeString) || "-";
+}
 
-watch(
-  () => monthForApi.value,
-  (newMonth) => {
-    if (activeTab.value === "monthly") {
-      const [year, month] = newMonth.split("-");
-      workLogsStore.fetchMonthlyReport(parseInt(year), parseInt(month));
-    }
-  }
-);
+function typeLabel(type: string | undefined) {
+  if (!type) return "-";
+  return te(`workLogs.types.${type}`) ? t(`workLogs.types.${type}`) : type;
+}
 
-// Format time display
-//Since it gives me this error: Invalid time value: 08:56:00 RangeError: Invalid time value
-function formatTime(timeString: string | undefined) {
-  //console.log("timeString", timeString);
-  if (!timeString) return "-"; // Return a default value if the time is invalid
-  try {
-    // Combine the time string with today's date to create a valid Date object
-    const today = new Date();
-    const dateWithTime = parse(timeString, "HH:mm:ss", today);
-    return format(dateWithTime, "h:mm a");
-  } catch (error) {
-    console.error("Invalid time value:", timeString, error);
-    return "-";
-  }
+function categoryLabel(category: string | undefined) {
+  if (!category) return "-";
+  return te(`workLogs.categories.${category}`) ? t(`workLogs.categories.${category}`) : category;
+}
+
+function dayLabel(date: string, withYear = false) {
+  return `${formatApiDate(date, "EEE")}, ${formatApiDate(date, withYear ? "PP" : "d MMM")}`;
 }
 
 // Helper to determine if a day has work logs
@@ -179,9 +203,13 @@ function hasWorkLogs(day: any) {
   return day.checkIn || day.checkOut;
 }
 
-onMounted(async () => {
+function hasWorkedTime(day: any) {
+  return (day.workedMinutes || 0) > 0;
+}
+
+onMounted(() => {
   // Load daily report by default
-  await workLogsStore.fetchDailyReport(dateForApi.value);
+  loadActiveReport();
 });
 </script>
 
@@ -197,8 +225,11 @@ onMounted(async () => {
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
         <!-- Tabs - scrollable on mobile -->
         <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 order-2 sm:order-1">
-          <div class="flex space-x-2 bg-white rounded-lg shadow p-1 min-w-max">
+          <div class="flex space-x-2 bg-white rounded-lg shadow p-1 min-w-max" role="tablist">
             <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'daily'"
               @click="changeTab('daily')"
               class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               :class="
@@ -210,6 +241,9 @@ onMounted(async () => {
               {{ $t('workLogs.daily') }}
             </button>
             <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'weekly'"
               @click="changeTab('weekly')"
               class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               :class="
@@ -221,6 +255,9 @@ onMounted(async () => {
               {{ $t('workLogs.weekly') }}
             </button>
             <button
+              type="button"
+              role="tab"
+              :aria-selected="activeTab === 'monthly'"
               @click="changeTab('monthly')"
               class="px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
               :class="
@@ -234,10 +271,12 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Export PDF Button -->
+        <!-- Export PDF Button (a plan feature) -->
         <button
+          v-if="authStore.hasFeature('export_reports')"
+          type="button"
           @click="exportPdf"
-          :disabled="isExporting || !activeReport || !activeReport.days || activeReport.days.length === 0"
+          :disabled="isExporting || isLoading || isEmpty"
           class="flex items-center justify-center px-4 py-2 bg-primary-600 text-white font-medium rounded-md hover:bg-primary-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed order-1 sm:order-2"
         >
           <svg
@@ -287,17 +326,14 @@ onMounted(async () => {
         class="flex justify-between items-center p-4 border-b border-neutral-200"
       >
         <button
-          class="p-2 rounded-full hover:bg-neutral-100"
-          @click="
-            activeTab === 'daily'
-              ? previousDay()
-              : activeTab === 'weekly'
-              ? previousWeek()
-              : previousMonth()
-          "
+          type="button"
+          class="p-3 rounded-full hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+          :aria-label="$t('workLogs.previousPeriod')"
+          @click="shiftPeriod(-1)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
             class="h-5 w-5 text-neutral-600"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -311,41 +347,39 @@ onMounted(async () => {
         </button>
 
         <div class="text-center">
-          <h2 class="text-lg font-medium text-neutral-800">
-            {{
-              activeTab === "daily"
-                ? formattedSelectedDate
-                : activeTab === "weekly"
-                ? formattedSelectedWeek
-                : formattedSelectedMonth
-            }}
+          <h2 class="text-lg font-medium text-neutral-800 capitalize">
+            {{ periodTitle }}
           </h2>
-          <button
-            @click="
-              activeTab === 'daily'
-                ? setToday()
-                : activeTab === 'weekly'
-                ? setThisWeek()
-                : setThisMonth()
-            "
-            class="text-sm text-primary-600 hover:text-primary-700 mt-1"
-          >
-            {{ $t('workLogs.today') }}
-          </button>
+          <div class="mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+            <button
+              v-if="!isCurrentPeriod"
+              type="button"
+              @click="goToCurrentPeriod"
+              class="text-sm text-primary-600 hover:text-primary-700 py-1"
+            >
+              {{ currentPeriodLabel }}
+            </button>
+            <input
+              :type="activeTab === 'monthly' ? 'month' : 'date'"
+              :value="pickerValue"
+              :max="activeTab === 'monthly' ? todayForInput.slice(0, 7) : todayForInput"
+              :aria-label="$t('workLogs.goToDate')"
+              class="text-sm text-neutral-600 border border-neutral-300 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              @change="onPickDate"
+            />
+          </div>
         </div>
 
         <button
-          class="p-2 rounded-full hover:bg-neutral-100"
-          @click="
-            activeTab === 'daily'
-              ? nextDay()
-              : activeTab === 'weekly'
-              ? nextWeek()
-              : nextMonth()
-          "
+          type="button"
+          class="p-3 rounded-full hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          :aria-label="$t('workLogs.nextPeriod')"
+          :disabled="isCurrentPeriod"
+          @click="shiftPeriod(1)"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
             class="h-5 w-5 text-neutral-600"
             viewBox="0 0 20 20"
             fill="currentColor"
@@ -360,17 +394,24 @@ onMounted(async () => {
       </div>
 
       <!-- Loading state -->
-      <div v-if="isLoading" class="p-8 flex justify-center">
+      <div v-if="isLoading" class="p-8 flex justify-center" role="status">
         <div
           class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"
         ></div>
+        <span class="sr-only">{{ $t('common.loading') }}</span>
       </div>
+
+      <!-- Error state: a failed request is not "no work logs" -->
+      <ErrorState
+        v-else-if="hasError"
+        class="shadow-none"
+        :message="$t('workLogs.fetchError')"
+        @retry="loadActiveReport"
+      />
 
       <!-- Empty state -->
       <div
-        v-else-if="
-          !activeReport || !activeReport.days || activeReport.days.length === 0
-        "
+        v-else-if="isEmpty || !activeReport"
         class="p-8 text-center"
       >
         <div
@@ -404,7 +445,7 @@ onMounted(async () => {
           class="flex justify-between items-center bg-neutral-50 p-4 border-b border-neutral-200"
         >
           <div>
-            <span class="text-sm text-neutral-600">{{ $t('workLogs.totalDays') }}: </span>
+            <span class="text-sm text-neutral-600">{{ $t('workLogs.daysWorked') }}: </span>
             <span class="font-medium">{{ activeReport.totalDays }}</span>
           </div>
           <div>
@@ -429,8 +470,8 @@ onMounted(async () => {
               class="flex flex-col md:flex-row md:justify-between md:items-center mb-4"
             >
               <div class="mb-2 md:mb-0">
-                <h3 class="font-medium text-neutral-800">
-                  {{ format(parseISO(day.date), "EEEE, MMMM d, yyyy", { locale: dateLocale }) }}
+                <h3 class="font-medium text-neutral-800 capitalize">
+                  {{ formatApiDate(day.date, "PPPP") }}
                 </h3>
               </div>
 
@@ -495,9 +536,12 @@ onMounted(async () => {
                   </svg>
                   <div>
                     <span class="text-sm text-neutral-600">{{ $t('workLogs.duration') }}:</span>
-                    <span class="font-medium ml-1">{{
+                    <span class="font-medium ml-1 tabular-nums">{{
                       day.duration || "0:00"
                     }}</span>
+                    <span v-if="day.inProgress" class="ml-2 text-xs text-primary-600">
+                      {{ $t('workLogs.inProgress') }}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -555,15 +599,15 @@ onMounted(async () => {
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                       >
-                        {{ log.type || "-" }}
+                        {{ typeLabel(log.type) }}
                       </td>
                       <td
                         class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
                       >
-                        {{ log.category || "-" }}
+                        {{ categoryLabel(log.category) }}
                       </td>
                       <td
-                        class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
+                        class="px-6 py-4 text-sm text-neutral-600 break-words max-w-xs"
                       >
                         {{ log.notes || "-" }}
                       </td>
@@ -591,11 +635,11 @@ onMounted(async () => {
                   <div class="grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span class="text-neutral-500">{{ $t('workLogs.type') }}:</span>
-                      <span class="ml-1 text-neutral-700">{{ log.type || "-" }}</span>
+                      <span class="ml-1 text-neutral-700">{{ typeLabel(log.type) }}</span>
                     </div>
                     <div>
                       <span class="text-neutral-500">{{ $t('workLogs.category') }}:</span>
-                      <span class="ml-1 text-neutral-700">{{ log.category || "-" }}</span>
+                      <span class="ml-1 text-neutral-700">{{ categoryLabel(log.category) }}</span>
                     </div>
                   </div>
                   <div v-if="log.notes" class="mt-2 text-sm text-neutral-600">
@@ -649,9 +693,9 @@ onMounted(async () => {
                   :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
                 >
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800 capitalize"
                   >
-                    {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
+                    {{ dayLabel(day.date) }}
                   </td>
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
@@ -666,7 +710,7 @@ onMounted(async () => {
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium"
                     :class="
-                      day.duration ? 'text-primary-600' : 'text-neutral-500'
+                      hasWorkedTime(day) ? 'text-primary-600' : 'text-neutral-500'
                     "
                   >
                     {{ day.duration || "0:00" }}
@@ -685,12 +729,12 @@ onMounted(async () => {
               :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
             >
               <div class="flex justify-between items-center mb-2">
-                <span class="font-medium text-neutral-800">
-                  {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
+                <span class="font-medium text-neutral-800 capitalize">
+                  {{ dayLabel(day.date) }}
                 </span>
                 <span
                   class="font-medium"
-                  :class="day.duration ? 'text-primary-600' : 'text-neutral-500'"
+                  :class="hasWorkedTime(day) ? 'text-primary-600' : 'text-neutral-500'"
                 >
                   {{ day.duration || "0:00" }}
                 </span>
@@ -748,9 +792,9 @@ onMounted(async () => {
                   :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
                 >
                   <td
-                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800"
+                    class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800 capitalize"
                   >
-                    {{ format(parseISO(day.date), "EEE, MMM d, yyyy", { locale: dateLocale }) }}
+                    {{ dayLabel(day.date, true) }}
                   </td>
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600"
@@ -765,7 +809,7 @@ onMounted(async () => {
                   <td
                     class="px-6 py-4 whitespace-nowrap text-sm font-medium"
                     :class="
-                      day.duration ? 'text-primary-600' : 'text-neutral-500'
+                      hasWorkedTime(day) ? 'text-primary-600' : 'text-neutral-500'
                     "
                   >
                     {{ day.duration || "0:00" }}
@@ -784,12 +828,12 @@ onMounted(async () => {
               :class="{ 'bg-neutral-50': !hasWorkLogs(day) }"
             >
               <div class="flex justify-between items-center mb-2">
-                <span class="font-medium text-neutral-800">
-                  {{ format(parseISO(day.date), "EEE, MMM d", { locale: dateLocale }) }}
+                <span class="font-medium text-neutral-800 capitalize">
+                  {{ dayLabel(day.date) }}
                 </span>
                 <span
                   class="font-medium"
-                  :class="day.duration ? 'text-primary-600' : 'text-neutral-500'"
+                  :class="hasWorkedTime(day) ? 'text-primary-600' : 'text-neutral-500'"
                 >
                   {{ day.duration || "0:00" }}
                 </span>

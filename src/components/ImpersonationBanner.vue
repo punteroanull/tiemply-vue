@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAuthStore } from '@/stores/auth';
 
@@ -17,31 +17,54 @@ onBeforeUnmount(() => {
   if (timer) window.clearInterval(timer);
 });
 
-/** Time left before the session expires on its own, as mm:ss. */
-const remaining = computed(() => {
+/** Seconds left before the session expires on its own, or null when unknown. */
+const secondsLeft = computed(() => {
   const expiresAt = authStore.impersonation?.expiresAt;
   if (!expiresAt) return null;
 
-  const seconds = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now.value) / 1000));
-  const minutes = Math.floor(seconds / 60);
+  const expiry = new Date(expiresAt).getTime();
+  if (isNaN(expiry)) return null;
 
-  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+  return Math.max(0, Math.floor((expiry - now.value) / 1000));
+});
+
+/** Time left as mm:ss. */
+const remaining = computed(() => {
+  if (secondsLeft.value === null) return null;
+
+  const minutes = Math.floor(secondsLeft.value / 60);
+
+  return `${String(minutes).padStart(2, '0')}:${String(secondsLeft.value % 60).padStart(2, '0')}`;
 });
 
 const stopping = ref(false);
 
-async function stop() {
+async function stop(options: { silent?: boolean } = {}) {
+  if (stopping.value) return;
   stopping.value = true;
-  await authStore.stopImpersonation();
-  stopping.value = false;
+  try {
+    await authStore.stopImpersonation(options);
+  } finally {
+    stopping.value = false;
+  }
 }
+
+// The session is over once the countdown runs out. Hand it back there and then, rather
+// than leaving a dead session on screen until the next request happens to fail.
+watch(
+  secondsLeft,
+  (left) => {
+    if (left === 0) stop({ silent: true });
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
   <div
     v-if="authStore.isImpersonating"
     class="fixed inset-x-0 top-0 z-[60] flex h-10 items-center justify-between gap-3 bg-amber-500 px-4 text-sm text-amber-950 shadow"
-    role="alert"
+    role="status"
   >
     <p class="truncate">
       <span class="font-semibold">{{ t('impersonation.banner.viewingAs') }}</span>
@@ -63,13 +86,14 @@ async function stop() {
           : t('impersonation.banner.readOnly') }}
       </span>
 
-      <span v-if="remaining" class="hidden font-mono text-xs sm:inline">{{ remaining }}</span>
+      <!-- Ticks every second: kept out of the live region so it is not read out each time. -->
+      <span v-if="remaining" class="hidden font-mono text-xs sm:inline" aria-hidden="true">{{ remaining }}</span>
 
       <button
         type="button"
         class="rounded bg-amber-950 px-3 py-1 text-xs font-medium text-white hover:bg-black disabled:opacity-50"
         :disabled="stopping"
-        @click="stop"
+        @click="stop()"
       >
         {{ t('impersonation.banner.exit') }}
       </button>

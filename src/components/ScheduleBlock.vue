@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import { formatClockTime } from "../utils/apiDates";
 import type { ScheduleBlock } from "../types";
 
 const props = defineProps<{
@@ -10,23 +11,9 @@ const props = defineProps<{
 
 const { t } = useI18n();
 
-const formattedStartTime = computed(() => {
-  return formatTime(props.block.startTime);
-});
-
-const formattedEndTime = computed(() => {
-  return formatTime(props.block.endTime);
-});
-
-function formatTime(time: string): string {
-  // Assuming time is in HH:mm:ss or HH:mm format
-  const parts = time.split(":");
-  const hours = parseInt(parts[0], 10);
-  const minutes = parts[1] || "00";
-  const ampm = hours >= 12 ? "PM" : "AM";
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${minutes} ${ampm}`;
-}
+// 24-hour clock in every language, like the rest of the app.
+const formattedStartTime = computed(() => formatClockTime(props.block.startTime));
+const formattedEndTime = computed(() => formatClockTime(props.block.endTime));
 
 const blockClass = computed(() => {
   return props.compact
@@ -42,13 +29,14 @@ const blockClass = computed(() => {
       blockClass,
     ]"
   >
-    <div class="flex items-center justify-between gap-2">
-      <span class="font-medium text-primary-700">
+    <!-- Wraps: in the narrow weekly columns the "next day" chip drops under the time. -->
+    <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+      <span class="font-medium text-primary-700 whitespace-nowrap">
         {{ formattedStartTime }} - {{ formattedEndTime }}
       </span>
       <span
         v-if="block.crossesMidnight"
-        class="text-xs text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded"
+        class="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded"
       >
         {{ t("schedule.nextDay") }}
       </span>

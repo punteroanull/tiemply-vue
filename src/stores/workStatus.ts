@@ -5,55 +5,40 @@ import api from "../services/api";
 import { useToast } from "vue-toastification";
 import { useAuthStore } from "./auth";
 import i18n from "../i18n";
-import { format, formatDistance, parseISO, isValid } from "date-fns";
-
-// Helper function to safely parse and validate a date string
-function parseAndValidateDate(dateValue: string | Date | undefined | null): Date | null {
-  if (!dateValue) return null;
-
-  // Si ya es un objeto Date
-  if (dateValue instanceof Date) {
-    return isValid(dateValue) ? dateValue : null;
-  }
-
-  if (typeof dateValue !== 'string') {
-    console.warn('parseAndValidateDate: received non-string value:', dateValue);
-    return null;
-  }
-
-  try {
-    // Intentar parsear como ISO
-    const parsed = parseISO(dateValue);
-    if (isValid(parsed)) {
-      return parsed;
-    }
-
-    // Fallback: intentar con new Date()
-    const fallbackDate = new Date(dateValue);
-    if (isValid(fallbackDate)) {
-      return fallbackDate;
-    }
-
-    console.warn('parseAndValidateDate: could not parse date:', dateValue);
-    return null;
-  } catch (error) {
-    console.warn('parseAndValidateDate: error parsing date:', dateValue, error);
-    return null;
-  }
-}
+import { unwrap, apiErrorMessage } from "../utils/apiResponse";
+import {
+  formatApiDate,
+  formatClockTime,
+  formatMinutesAsClock,
+} from "../utils/apiDates";
 import {
   getCurrentPosition,
-  getAddressFromCoords,
   formatCoordinates,
   isGeolocationAvailable,
   type GeolocationData,
   type GeolocationError,
 } from "../utils/geolocation";
-import type {
-  WorkLogCategory,
-  WorkState,
-  OvertimeRegistered,
-} from '../types';
+import {
+  getPendingActions,
+  savePendingAction,
+  syncPendingActions,
+} from "../utils/offlineManager";
+import type { WorkLogCategory, WorkState } from "../types";
+
+export type ClockInCategory = "shift_start" | "break_end" | "offsite_end";
+export type ClockOutCategory = "shift_end" | "break_start" | "offsite_start";
+
+/**
+ * Why a clock action did not go through. The offline queue needs the difference: a
+ * `network` or `location` failure is worth retrying later, a `rejected` one is final.
+ */
+export type ActionFailure = "busy" | "auth" | "location" | "network" | "rejected";
+
+export interface ActionResult {
+  ok: boolean;
+  reason?: ActionFailure;
+  message?: string;
+}
 
 interface WorkStatus {
   checkedIn: boolean;
@@ -61,6 +46,10 @@ interface WorkStatus {
   currentState?: WorkState;
   lastCheckIn?: string;
   lastCheckOut?: string;
+  /** When the shift in progress started, regardless of the breaks taken since. */
+  shiftStartedAt?: string;
+  /** Time of the latest entry of any kind: when the current break or outing began. */
+  lastActivityAt?: string;
   currentDuration?: string;
 }
 
@@ -73,30 +62,66 @@ interface CompanySettings {
   officeAddress?: string;
 }
 
+const CLOCK_IN_CATEGORIES: WorkLogCategory[] = ["shift_start", "break_end", "offsite_end"];
+
+function isClockIn(category: WorkLogCategory): category is ClockInCategory {
+  return CLOCK_IN_CATEGORIES.includes(category);
+}
+
+function toIso(value: unknown): string | undefined {
+  if (!value) return undefined;
+  const date = value instanceof Date ? value : new Date(value as string);
+  return isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function stateAfter(category: WorkLogCategory | undefined | null): WorkState {
+  switch (category) {
+    case "shift_start":
+    case "break_end":
+    case "offsite_end":
+      return "working";
+    case "break_start":
+      return "on_break";
+    case "offsite_start":
+      return "offsite";
+    default:
+      return "not_working";
+  }
+}
+
+function isOnline(): boolean {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
+}
+
 export const useWorkStatusStore = defineStore("workStatus", () => {
   const toast = useToast();
   const authStore = useAuthStore();
 
   // The store lives outside the component tree, so it uses the global i18n instance rather
-  // than useI18n(). Messages shown here were hardcoded in English until now.
-  const t = (key: string, params?: Record<string, unknown>) =>
-    (i18n.global.t as (k: string, p?: Record<string, unknown>) => string)(key, params);
+  // than useI18n().
+  const t = (key: string, params?: Record<string, unknown>, plural?: number) =>
+    plural === undefined
+      ? (i18n.global.t as any)(key, params ?? {})
+      : (i18n.global.t as any)(key, params ?? {}, plural);
 
   const status = ref<WorkStatus | null>(null);
   const loading = ref(false);
+  const statusError = ref(false);
   const checkingIn = ref(false);
   const checkingOut = ref(false);
   const refreshInterval = ref<number | null>(null);
   const durationUpdateInterval = ref<number | null>(null);
   const currentDuration = ref<string>("");
-  const currentState = ref<WorkState>('not_working');
+  const currentState = ref<WorkState>("not_working");
   const lastCategory = ref<WorkLogCategory | null>(null);
 
-  // Night shift and overtime states
+  // Night shift
   const shiftDate = ref<string | null>(null);
   const isNightShift = ref(false);
-  const effectiveHours = ref<number | null>(null);
-  const lastOvertimeRegistered = ref<OvertimeRegistered | null>(null);
+
+  // Offline queue and the "end shift" confirmation shared by every entry point
+  const pendingCount = ref(0);
+  const confirmingEndShift = ref(false);
 
   // Geolocation states
   const gettingLocation = ref(false);
@@ -104,42 +129,47 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
   const locationError = ref<GeolocationError | null>(null);
   const companySettings = ref<CompanySettings>({});
 
+  const isBusy = computed(() => checkingIn.value || checkingOut.value);
   const isCheckedIn = computed(() => status.value?.checkedIn || false);
+
+  /** False until the company settings arrived: geolocation rules are unknown before that. */
+  const settingsLoaded = computed(
+    () => companySettings.value?.geolocationEnabled !== undefined
+  );
+
+  // The API skips every geolocation rule for remote workers, so the app must not block
+  // them for lacking a position either.
+  const isRemoteWorker = computed(
+    () => Boolean(authStore.currentEmployee?.isRemoteWorker)
+  );
+
   const isGeolocationEnabled = computed(
-    () => companySettings.value.geolocationEnabled || false
+    () => companySettings.value?.geolocationEnabled || false
   );
   const isGeolocationRequired = computed(
-    () => companySettings.value.geolocationRequired || false
+    () => (companySettings.value?.geolocationRequired || false) && !isRemoteWorker.value
   );
-  const isGeolocationAvailableComputed = computed(() =>
-    isGeolocationAvailable()
+  const isGeolocationAvailableComputed = computed(() => isGeolocationAvailable());
+
+  /** Start of the shift in progress ("HH:mm"). */
+  const formattedLastCheckIn = computed(() =>
+    formatClockTime(status.value?.shiftStartedAt ?? status.value?.lastCheckIn)
   );
 
-  const formattedLastCheckIn = computed(() => {
-    try {
-      const date = parseAndValidateDate(status.value?.lastCheckIn);
-      if (!date) return "";
-      return format(date, "h:mm a");
-    } catch (error) {
-      console.warn('formattedLastCheckIn: error formatting date:', error);
-      return "";
-    }
-  });
+  /** Time of the last exit: end of shift, or start of the current break or outing. */
+  const formattedLastCheckOut = computed(() =>
+    formatClockTime(
+      status.value?.lastCheckOut ??
+        (currentState.value === "working" ? undefined : status.value?.lastActivityAt)
+    )
+  );
 
-  const formattedLastCheckOut = computed(() => {
-    try {
-      const date = parseAndValidateDate(status.value?.lastCheckOut);
-      if (!date) return "";
-      return format(date, "h:mm a");
-    } catch (error) {
-      console.warn('formattedLastCheckOut: error formatting date:', error);
-      return "";
-    }
-  });
+  const formattedCurrentDuration = computed(() => currentDuration.value || "");
 
-  const formattedCurrentDuration = computed(() => {
-    return currentDuration.value || status.value?.currentDuration || "";
-  });
+  /** Shift date in the app language, only when it differs from the calendar day. */
+  const formattedShiftDate = computed(() =>
+    isNightShift.value && shiftDate.value ? formatApiDate(shiftDate.value, "PPP") : ""
+  );
 
   const formattedLocation = computed(() => {
     if (!locationData.value) return "";
@@ -150,49 +180,57 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     );
   });
 
-  const canStartShift = computed(() => currentState.value === 'not_working');
-  const canEndShift = computed(() => currentState.value === 'working');
-  const canStartBreak = computed(() => currentState.value === 'working');
-  const canEndBreak = computed(() => currentState.value === 'on_break');
-  const canStartOffsite = computed(() => currentState.value === 'working');
-  const canEndOffsite = computed(() => currentState.value === 'offsite');
+  const canStartShift = computed(() => currentState.value === "not_working");
+  const canEndShift = computed(() => currentState.value === "working");
+  const canStartBreak = computed(() => currentState.value === "working");
+  const canEndBreak = computed(() => currentState.value === "on_break");
+  const canStartOffsite = computed(() => currentState.value === "working");
+  const canEndOffsite = computed(() => currentState.value === "offsite");
 
   const stateLabel = computed(() => {
     switch (currentState.value) {
-      case 'working': return 'Working';
-      case 'on_break': return 'On Break';
-      case 'offsite': return 'Offsite';
-      default: return 'Not Working';
+      case "working":
+        return t("workStatus.working");
+      case "on_break":
+        return t("workStatus.onBreak");
+      case "offsite":
+        return t("workStatus.offsite");
+      default:
+        return t("workStatus.notWorking");
     }
   });
 
   const stateColor = computed(() => {
     switch (currentState.value) {
-      case 'working': return 'green';
-      case 'on_break': return 'amber';
-      case 'offsite': return 'blue';
-      default: return 'gray';
+      case "working":
+        return "green";
+      case "on_break":
+        return "amber";
+      case "offsite":
+        return "blue";
+      default:
+        return "gray";
     }
   });
 
-  async function fetchCompanySettings() {
-    try {
-      const employeeId = authStore.user?.employeeRecords?.[0]?.id;
-      if (!employeeId) return;
+  function getEmployeeId(): string | null {
+    return authStore.currentEmployee?.id || null;
+  }
 
-      const response = await api.get(
-        `/employees/${employeeId}/company-settings`
-      );
-      // Backend uses ApiResponse trait: { success: true, data: {...} }
-      // Axios response is in response.data, so actual data is in response.data.data
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        companySettings.value = response.data.data;
-      } else {
-        companySettings.value = response.data;
+  async function fetchCompanySettings() {
+    const employeeId = getEmployeeId();
+    if (!employeeId) return;
+
+    try {
+      const response = await api.get(`/employees/${employeeId}/company-settings`);
+      const settings = unwrap<CompanySettings>(response);
+      if (settings && typeof settings === "object") {
+        companySettings.value = settings;
       }
     } catch (error) {
+      // Left unknown on purpose: assuming "geolocation off" would send a clock action without
+      // a position to a company that requires one. The next action asks for them again.
       console.warn("Could not fetch company settings:", error);
-      companySettings.value = { geolocationEnabled: false };
     }
   }
 
@@ -202,8 +240,7 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       return null;
     }
 
-    // The browser has no geolocation API at all (an insecure context, typically). This used to
-    // return null silently, which made the clock-in button do nothing whatsoever.
+    // The browser has no geolocation API at all (an insecure context, typically).
     if (!isGeolocationAvailableComputed.value) {
       locationError.value = {
         code: 0,
@@ -223,26 +260,14 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
 
     try {
       const location = await getCurrentPosition();
+
+      // The position goes to the Tiemply API and nowhere else: no street-address lookup
+      // through an outside service.
       locationData.value = location;
-
-      // Intentar obtener la dirección (opcional)
-      try {
-        const address = await getAddressFromCoords(
-          location.latitude,
-          location.longitude
-        );
-        if (address) {
-          locationData.value.address = address;
-        }
-      } catch (addressError) {
-        console.warn("Could not get address:", addressError);
-      }
-
       return location;
     } catch (error) {
       const geoError = error as GeolocationError;
       locationError.value = geoError;
-      console.warn("Could not get location:", geoError.message);
 
       const reason = t(geoError.messageKey ?? "geolocation.errors.unknown");
 
@@ -258,436 +283,387 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     }
   }
 
-  /**
-   * Clear the last location failure and try again.
-   *
-   * Without this, a single failure left the user stuck: the clock-in button disabled itself on
-   * locationError and there was no way back other than reloading the page.
-   */
+  /** Clear the last location failure and try again. */
   async function retryLocation(): Promise<GeolocationData | null> {
     locationError.value = null;
 
     return getCurrentLocation();
   }
 
-  async function fetchStatus() {
-    if (!authStore.user?.id) return;
+  /**
+   * Put the store in the state a clock action leaves behind, without asking the server.
+   * Used right after a successful request and for entries waiting in the offline queue.
+   */
+  function applyLocalState(category: WorkLogCategory, at: Date = new Date()) {
+    const iso = at.toISOString();
+    const state = stateAfter(category);
+    const previous = status.value;
+    const clockIn = isClockIn(category);
 
-    loading.value = true;
+    currentState.value = state;
+    lastCategory.value = category;
+
+    status.value = {
+      checkedIn: clockIn,
+      currentCategory: category,
+      currentState: state,
+      lastCheckIn: clockIn ? iso : previous?.lastCheckIn,
+      lastCheckOut: clockIn ? undefined : iso,
+      shiftStartedAt:
+        category === "shift_start"
+          ? iso
+          : category === "shift_end"
+          ? undefined
+          : previous?.shiftStartedAt,
+      lastActivityAt: iso,
+      currentDuration: "",
+    };
+
+    if (category === "shift_end") {
+      isNightShift.value = false;
+      shiftDate.value = null;
+    }
+
+    syncTimers();
+  }
+
+  /** Show entries still waiting in the offline queue on top of what the server knows. */
+  function applyPendingQueue() {
+    const employeeId = getEmployeeId();
+    const pending = employeeId ? getPendingActions(employeeId) : [];
+    pendingCount.value = pending.length;
+
+    for (const action of pending) {
+      const category = action.data?.category as WorkLogCategory | undefined;
+      if (category) {
+        applyLocalState(category, new Date(action.timestamp));
+      }
+    }
+  }
+
+  /**
+   * Load the current state from the server.
+   *
+   * `silent` is for background refreshes: a failed poll must not interrupt the user, least
+   * of all once a minute while they have no signal.
+   */
+  async function fetchStatus(options: { silent?: boolean } = {}): Promise<boolean> {
+    const employeeId = getEmployeeId();
+    if (!authStore.user?.id || !employeeId) return false;
+
+    if (!options.silent) loading.value = true;
 
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
-      if (!employeeId) {
-        throw new Error("Employee record not found");
-      }
-
       const response = await api.get(`/worklogs/status/${employeeId}`);
-      // Backend uses ApiResponse trait: { success: true, data: { employee, status, category, lastActivity } }
-      // Axios response is in response.data, so actual data is in response.data.data
-      // Note: API response is now in camelCase (converted by api.ts interceptor)
-      let apiData;
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        apiData = response.data.data;
-      } else {
-        apiData = response.data;
+      const apiData = unwrap<any>(response);
+      if (!apiData || typeof apiData !== "object") {
+        throw new Error("Unexpected status response");
       }
 
-      // Determinar el estado actual basado en la categoria
-      let workState: WorkState = 'not_working';
-      const category = apiData.category as WorkLogCategory | undefined;
-
-      if (apiData.status === 'in') {
-        switch (category) {
-          case 'break_start':
-            workState = 'on_break';
-            break;
-          case 'offsite_start':
-            workState = 'offsite';
-            break;
-          default:
-            workState = 'working';
-        }
-      } else if (apiData.status === 'out') {
-        // Cuando está en checkout, verificar si es break u offsite activo
-        switch (category) {
-          case 'break_start':
-            workState = 'on_break';
-            break;
-          case 'offsite_start':
-            workState = 'offsite';
-            break;
-          default:
-            workState = 'not_working';
-        }
-      }
+      const category = (apiData.category || undefined) as WorkLogCategory | undefined;
+      const workState = stateAfter(category);
+      const lastActivityAt = toIso(apiData.lastActivity?.time);
+      const checkedIn = apiData.status === "in";
 
       lastCategory.value = category || null;
       currentState.value = workState;
 
-      // Validar y normalizar el tiempo de lastActivity
-      let lastActivityTime: string | undefined;
-      if (apiData.lastActivity?.time) {
-        try {
-          const parsedTime = parseAndValidateDate(apiData.lastActivity.time);
-          if (parsedTime && isValid(parsedTime)) {
-            lastActivityTime = parsedTime.toISOString();
-          }
-        } catch (parseError) {
-          console.warn('fetchStatus: error parsing lastActivity.time:', apiData.lastActivity.time, parseError);
-          lastActivityTime = undefined;
-        }
-      }
-
       status.value = {
-        checkedIn: apiData.status === 'in',
+        checkedIn,
         currentCategory: category,
         currentState: workState,
-        lastCheckIn: apiData.status === 'in' ? lastActivityTime : undefined,
-        lastCheckOut: apiData.status === 'out' ? lastActivityTime : undefined,
-        currentDuration: '',
+        lastCheckIn: checkedIn ? lastActivityAt : undefined,
+        lastCheckOut: checkedIn ? undefined : lastActivityAt,
+        shiftStartedAt:
+          workState === "not_working"
+            ? undefined
+            : toIso(apiData.shiftStartedAt) ??
+              (category === "shift_start" ? lastActivityAt : undefined),
+        lastActivityAt,
+        currentDuration: "",
       };
 
-      if (status.value.checkedIn && status.value.lastCheckIn) {
-        updateCurrentDuration();
+      if (apiData.isNightShift !== undefined) {
+        isNightShift.value = Boolean(apiData.isNightShift) && workState !== "not_working";
       }
-    } catch (error: any) {
-      console.error("Error fetching work status:", error);
-      toast.error("Failed to fetch your current work status");
+      if (apiData.shiftDate !== undefined) {
+        shiftDate.value = workState === "not_working" ? null : apiData.shiftDate;
+      }
+
+      statusError.value = false;
+      applyPendingQueue();
+      syncTimers();
+      return true;
+    } catch (error) {
+      statusError.value = true;
+      // Without a server answer the queue is all there is: keep showing what the user did.
+      applyPendingQueue();
+      if (!options.silent && isOnline()) {
+        toast.error(t("workStatus.toasts.statusError"));
+      }
+      return false;
     } finally {
-      loading.value = false;
+      if (!options.silent) loading.value = false;
     }
   }
 
   function updateCurrentDuration() {
-    try {
-      if (!status.value?.checkedIn || !status.value?.lastCheckIn) {
-        currentDuration.value = "";
-        return;
-      }
-
-      const checkInTime = parseAndValidateDate(status.value.lastCheckIn);
-      if (!checkInTime || !isValid(checkInTime)) {
-        console.warn('updateCurrentDuration: invalid checkInTime from:', status.value.lastCheckIn);
-        currentDuration.value = "";
-        return;
-      }
-
-      const now = new Date();
-      if (!isValid(now)) {
-        currentDuration.value = "";
-        return;
-      }
-
-      // Validar que checkInTime no sea futuro
-      if (checkInTime.getTime() > now.getTime()) {
-        currentDuration.value = "";
-        return;
-      }
-
-      // Double-check que ambas fechas son válidas antes de formatDistance
-      if (isNaN(checkInTime.getTime()) || isNaN(now.getTime())) {
-        currentDuration.value = "";
-        return;
-      }
-
-      currentDuration.value = formatDistance(now, checkInTime, {
-        addSuffix: false,
-      });
-    } catch (error) {
-      console.warn('updateCurrentDuration: error calculating duration:', error);
+    const current = status.value;
+    if (!current || currentState.value === "not_working") {
       currentDuration.value = "";
+      return;
     }
+
+    // While working the clock runs from the start of the shift; on a break or away from the
+    // office it shows how long that has lasted.
+    const sinceIso =
+      currentState.value === "working"
+        ? current.shiftStartedAt ?? current.lastActivityAt
+        : current.lastActivityAt;
+    const since = sinceIso ? new Date(sinceIso) : null;
+
+    if (!since || isNaN(since.getTime()) || since.getTime() > Date.now()) {
+      currentDuration.value = "";
+      return;
+    }
+
+    currentDuration.value = formatMinutesAsClock(
+      Math.floor((Date.now() - since.getTime()) / 60000)
+    );
   }
 
-  function getCategoryNote(category: WorkLogCategory): string {
-    const notes: Record<WorkLogCategory, string> = {
-      shift_start: 'Started shift via Tiemply app',
-      shift_end: 'Ended shift via Tiemply app',
-      break_start: 'Started break via Tiemply app',
-      break_end: 'Returned from break via Tiemply app',
-      offsite_start: 'Left office (offsite) via Tiemply app',
-      offsite_end: 'Returned to office via Tiemply app',
-    };
-    return notes[category];
-  }
+  /**
+   * Record a clock action on the server.
+   *
+   * `quiet` suppresses the toasts: the offline queue reports its own summary instead of one
+   * message per replayed entry.
+   */
+  async function submit(
+    category: WorkLogCategory,
+    options: { notes?: string; quiet?: boolean; occurredAt?: number } = {}
+  ): Promise<ActionResult> {
+    // A double tap, or the queue replaying while the user presses a button, must not send
+    // the same entry twice.
+    if (isBusy.value) return { ok: false, reason: "busy" };
 
-  async function checkIn(category: 'shift_start' | 'break_end' | 'offsite_end' = 'shift_start') {
-    if (!authStore.user?.id) return false;
+    const employeeId = getEmployeeId();
+    if (!authStore.user?.id || !employeeId) {
+      if (!options.quiet) toast.error(t("workStatus.toasts.noEmployee"));
+      return { ok: false, reason: "auth" };
+    }
 
-    checkingIn.value = true;
+    const clockIn = isClockIn(category);
+    const flag = clockIn ? checkingIn : checkingOut;
+    flag.value = true;
 
     try {
-      const employeeId = authStore.user.employeeRecords?.[0]?.id;
-      if (!employeeId) {
-        throw new Error("Employee record not found");
+      if (!settingsLoaded.value) {
+        await fetchCompanySettings();
       }
 
-      // Obtener ubicación si está habilitada
       let location: GeolocationData | null = null;
       if (isGeolocationEnabled.value) {
         location = await getCurrentLocation();
 
-        // Si la geolocalización es requerida y no se pudo obtener, abortar. getCurrentLocation()
-        // ya ha avisado del motivo concreto; este aviso garantiza que el usuario ve algo aunque
-        // se añada en el futuro un camino que devuelva null en silencio.
+        // getCurrentLocation() already explained the specific cause; the generic message
+        // only covers a path that returned null without recording one.
         if (isGeolocationRequired.value && !location) {
-          if (!locationError.value) {
-            toast.error(t("geolocation.errors.abortedCheckIn"));
+          if (!locationError.value && !options.quiet) {
+            toast.error(
+              t(clockIn ? "geolocation.errors.abortedCheckIn" : "geolocation.errors.abortedCheckOut")
+            );
           }
-          return false;
+          return { ok: false, reason: "location" };
         }
       }
 
-      // Preparar datos para el check-in
-      const checkInData: any = {
+      const payload: Record<string, unknown> = {
         employee_id: employeeId,
-        category: category,
-        notes: getCategoryNote(category),
+        category,
+        notes: options.notes || t(`workStatus.notes.${category}`),
       };
 
-      // Añadir datos de ubicación si están disponibles
+      // Only for entries replayed from the offline queue: the moment the person acted,
+      // which the API uses instead of the time the request arrives.
+      if (options.occurredAt && Number.isFinite(options.occurredAt)) {
+        payload.occurred_at = new Date(options.occurredAt).toISOString();
+      }
+
       if (location) {
-        checkInData.location = {
+        payload.location = {
           latitude: location.latitude,
           longitude: location.longitude,
           accuracy: location.accuracy,
           timestamp: location.timestamp,
-          address: location.address,
         };
       }
 
-      const response = await api.post("/worklogs/check-in", checkInData);
+      const response = await api.post(
+        clockIn ? "/worklogs/check-in" : "/worklogs/check-out",
+        payload
+      );
 
-      // Validar que el backend indica éxito
-      if (response.data?.success === false) {
-        const errorMessage = response.data?.message || 'Check-in failed on server';
-        console.error('[CheckIn] Server returned success: false', { message: errorMessage });
-        toast.error(errorMessage);
-        return false;
+      if (response?.data?.success === false) {
+        const message = response.data?.message || t("workStatus.toasts.actionFailed");
+        if (!options.quiet) toast.error(message);
+        return { ok: false, reason: "rejected", message };
       }
 
-      // Extract data from response
-      let responseData: any = null;
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        responseData = response.data.data;
-      } else {
-        responseData = response.data;
-      }
+      const recorded = unwrap<any>(response);
 
-      // Handle night shift data
-      if (responseData?.shiftDate) {
-        shiftDate.value = responseData.shiftDate;
-      }
-      if (responseData?.isNightShift !== undefined) {
-        isNightShift.value = responseData.isNightShift;
-      }
-      if (responseData?.effectiveHours !== undefined) {
-        effectiveHours.value = responseData.effectiveHours;
-      }
+      // The request went through: reflect it now, then confirm with the server. If that
+      // second request fails the entry is still recorded, so the state stays as applied.
+      applyLocalState(category);
 
-      await fetchStatus();
-
-      let successMessage = "You have successfully checked in";
-      if (location) {
-        successMessage += ` at ${formattedLocation.value}`;
-      }
-
-      toast.success(successMessage);
-      startRefreshInterval();
-      startDurationUpdateInterval();
-      return true;
-    } catch (error: any) {
-      if (error.response) {
-        const statusCode = error.response.status;
-        const errorMessage =
-          error.response.data?.message || "An error occurred";
-
-        if (statusCode === 422) {
-          toast.error(errorMessage);
-        } else {
-          toast.error(`Error ${statusCode}: ${errorMessage}`);
+      if (recorded && typeof recorded === "object" && category !== "shift_end") {
+        if (recorded.isNightShift !== undefined) {
+          isNightShift.value = Boolean(recorded.isNightShift);
         }
-      } else {
-        console.error("Check-in error:", error);
-        toast.error("Failed to check in. Please try again.");
+        if (recorded.shiftDate) {
+          shiftDate.value = recorded.shiftDate;
+        }
       }
-      return false;
+
+      const confirmed = await fetchStatus({ silent: true });
+
+      if (confirmed && category === "shift_end" && currentState.value !== "not_working") {
+        const message = t("messages.checkoutNotRecorded");
+        if (!options.quiet) toast.warning(message);
+        return { ok: false, reason: "rejected", message };
+      }
+
+      if (!options.quiet) toast.success(t(`workStatus.toasts.${category}`));
+
+      if (category === "shift_end") {
+        locationData.value = null;
+        locationError.value = null;
+      }
+
+      return { ok: true };
+    } catch (error: any) {
+      const statusCode: number | undefined = error?.response?.status;
+
+      if (!statusCode) {
+        if (!options.quiet) toast.error(t("workStatus.toasts.actionFailed"));
+        return { ok: false, reason: "network" };
+      }
+
+      const message = apiErrorMessage(error, t("workStatus.toasts.actionFailed"));
+
+      if (!options.quiet) {
+        toast.error(
+          // Refusals that carry their own explanation: invalid data, a deactivated
+          // employee record, or another entry of the same person still being recorded.
+          statusCode === 422 || statusCode === 403 || statusCode === 409
+            ? message
+            : t("workStatus.toasts.serverError", { status: statusCode, message })
+        );
+      }
+
+      // A server fault, an expired session or another entry in progress (409) says
+      // nothing about this entry itself: it can be sent again.
+      const retryable =
+        statusCode >= 500 ||
+        statusCode === 401 ||
+        statusCode === 408 ||
+        statusCode === 409 ||
+        statusCode === 429;
+      return { ok: false, reason: retryable ? "network" : "rejected", message };
     } finally {
-      checkingIn.value = false;
+      flag.value = false;
     }
   }
 
-  async function checkOut(category: 'shift_end' | 'break_start' | 'offsite_start' = 'shift_end') {
-    if (!authStore.user?.id) return false;
+  async function checkIn(category: ClockInCategory = "shift_start") {
+    return (await submit(category)).ok;
+  }
 
-    const employeeId = authStore.user.employeeRecords?.[0]?.id;
-    console.log('[CheckOut] Starting checkout', { category, userId: authStore.user?.id, employeeId });
+  async function checkOut(category: ClockOutCategory = "shift_end") {
+    return (await submit(category)).ok;
+  }
 
-    checkingOut.value = true;
+  /** Replay an entry from the offline queue. See utils/offlineManager. */
+  function submitQueuedAction(category: WorkLogCategory, notes?: string, occurredAt?: number) {
+    return submit(category, { notes, quiet: true, occurredAt });
+  }
 
-    try {
-      if (!employeeId) {
-        throw new Error("Employee record not found");
-      }
-
-      // Obtener ubicación si está habilitada
-      let location: GeolocationData | null = null;
-      if (isGeolocationEnabled.value) {
-        console.log('[CheckOut] Geolocation enabled, attempting to get location...');
-        location = await getCurrentLocation();
-        console.log('[CheckOut] Geolocation result:', location ? { lat: location.latitude, lng: location.longitude, accuracy: location.accuracy } : 'null');
-
-        // Si la geolocalización es requerida y no se pudo obtener, abortar con mensaje de error
-        if (isGeolocationRequired.value && !location) {
-          console.error('[CheckOut] ABORTED: Geolocation required but not available');
-          // getCurrentLocation() already explained the specific cause; only fall back to the
-          // generic message when it somehow returned null without recording one.
-          if (!locationError.value) {
-            toast.error(t("geolocation.errors.abortedCheckOut"));
-          }
-          return false;
-        }
-      }
-
-      // Preparar datos para el check-out
-      const checkOutData: any = {
-        employee_id: employeeId,
-        category: category,
-        notes: getCategoryNote(category),
-      };
-
-      // Añadir datos de ubicación si están disponibles
-      if (location) {
-        checkOutData.location = {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          accuracy: location.accuracy,
-          timestamp: location.timestamp,
-          address: location.address,
-        };
-      }
-
-      console.log('[CheckOut] Sending request to server:', checkOutData);
-      const response = await api.post("/worklogs/check-out", checkOutData);
-      console.log('[CheckOut] Server response (raw):', response);
-      console.log('[CheckOut] Server response (data):', response.data);
-
-      // Validar que el backend indica éxito
-      if (response.data?.success === false) {
-        const errorMessage = response.data?.message || 'Check-out failed on server';
-        console.error('[CheckOut] Server returned success: false', { message: errorMessage });
-        toast.error(errorMessage);
-        return false;
-      }
-
-      // Extract data from response
-      let responseData: any = null;
-      if (response.data && typeof response.data === 'object' && 'data' in response.data) {
-        responseData = response.data.data;
-      } else {
-        responseData = response.data;
-      }
-
-      // Handle night shift data
-      if (responseData?.shiftDate) {
-        shiftDate.value = responseData.shiftDate;
-      }
-      if (responseData?.isNightShift !== undefined) {
-        isNightShift.value = responseData.isNightShift;
-      }
-      if (responseData?.effectiveHours !== undefined) {
-        effectiveHours.value = responseData.effectiveHours;
-      }
-
-      // Handle overtime registered
-      if (responseData?.overtimeRegistered) {
-        lastOvertimeRegistered.value = responseData.overtimeRegistered;
-        toast.info(responseData.overtimeRegistered.message);
-      }
-
-      // Guardar estado previo para validación
-      const wasCheckedIn = status.value?.checkedIn;
-      console.log('[CheckOut] State before fetchStatus:', { checkedIn: wasCheckedIn, category: status.value?.currentCategory });
-
-      await fetchStatus();
-
-      console.log('[CheckOut] State after fetchStatus:', { checkedIn: status.value?.checkedIn, category: status.value?.currentCategory });
-
-      // Validar consistencia: si era shift_end, el usuario debería estar deslogueado
-      if (category === 'shift_end' && status.value?.checkedIn === true) {
-        console.error('[CheckOut] INCONSISTENCY DETECTED: Server returned OK but status still shows checked-in');
-        toast.warning('Check-out may not have been recorded. Please verify in your work logs.');
-        // NO limpiar locationData - mantener datos para posible reintento
-        return false;
-      }
-
-      let successMessage = "You have successfully checked out";
-      if (location) {
-        successMessage += ` at ${formattedLocation.value}`;
-      }
-
-      toast.success(successMessage);
-      stopRefreshInterval();
-      stopDurationUpdateInterval();
-
-      // Limpiar datos de ubicación solo si el checkout fue exitoso y consistente
-      locationData.value = null;
-      locationError.value = null;
-
-      return true;
-    } catch (error: any) {
-      if (error.response) {
-        const statusCode = error.response.status;
-        const errorMessage =
-          error.response.data?.message || "An error occurred";
-
-        if (statusCode === 422) {
-          toast.error(errorMessage);
-        } else {
-          toast.error(`Error ${statusCode}: ${errorMessage}`);
-        }
-      } else {
-        console.error("Check-out error:", error);
-        toast.error("Failed to check out. Please try again.");
-      }
+  /** Keep an entry made without connection, and show it as done. */
+  function queueOffline(category: WorkLogCategory): boolean {
+    const employeeId = getEmployeeId();
+    if (!employeeId) {
+      toast.error(t("workStatus.toasts.noEmployee"));
       return false;
-    } finally {
-      checkingOut.value = false;
     }
+
+    const timestamp = Date.now();
+    savePendingAction({
+      type: isClockIn(category) ? "check-in" : "check-out",
+      timestamp,
+      employeeId,
+      data: { category, notes: t(`workStatus.notes.${category}`) },
+    });
+
+    applyLocalState(category, new Date(timestamp));
+    pendingCount.value = getPendingActions(employeeId).length;
+    toast.info(t("workStatus.toasts.savedOffline"));
+    return true;
+  }
+
+  /** Run a clock action now, or queue it when there is no connection. */
+  async function performAction(category: WorkLogCategory): Promise<boolean> {
+    if (isBusy.value || gettingLocation.value) return false;
+
+    if (!isOnline()) {
+      return queueOffline(category);
+    }
+
+    return (await submit(category)).ok;
+  }
+
+  /**
+   * Entry point for every button. Ending the shift cannot be undone by the employee, so
+   * it waits for an explicit confirmation; everything else runs straight away.
+   */
+  async function requestAction(category: WorkLogCategory): Promise<boolean> {
+    if (category === "shift_end") {
+      confirmingEndShift.value = true;
+      return false;
+    }
+
+    return performAction(category);
+  }
+
+  async function confirmEndShift(): Promise<boolean> {
+    confirmingEndShift.value = false;
+    return performAction("shift_end");
+  }
+
+  function cancelEndShift() {
+    confirmingEndShift.value = false;
   }
 
   async function startBreak() {
-    return await checkOut('break_start');
+    return await checkOut("break_start");
   }
 
   async function endBreak() {
-    return await checkIn('break_end');
+    return await checkIn("break_end");
   }
 
   async function startOffsite() {
-    return await checkOut('offsite_start');
+    return await checkOut("offsite_start");
   }
 
   async function endOffsite() {
-    return await checkIn('offsite_end');
+    return await checkIn("offsite_end");
   }
 
   async function endShift() {
-    return await checkOut('shift_end');
+    return await checkOut("shift_end");
   }
 
   async function startShift() {
-    return await checkIn('shift_start');
-  }
-
-  function startRefreshInterval() {
-    if (refreshInterval.value) {
-      clearInterval(refreshInterval.value);
-    }
-
-    refreshInterval.value = window.setInterval(() => {
-      fetchStatus();
-    }, 60000);
+    return await checkIn("shift_start");
   }
 
   function stopRefreshInterval() {
@@ -695,17 +671,6 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
       clearInterval(refreshInterval.value);
       refreshInterval.value = null;
     }
-  }
-
-  function startDurationUpdateInterval() {
-    if (durationUpdateInterval.value) {
-      clearInterval(durationUpdateInterval.value);
-    }
-
-    updateCurrentDuration();
-    durationUpdateInterval.value = window.setInterval(() => {
-      updateCurrentDuration();
-    }, 30000);
   }
 
   function stopDurationUpdateInterval() {
@@ -716,16 +681,37 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     currentDuration.value = "";
   }
 
-  async function initialize() {
-    // Obtener configuración de la empresa
-    await fetchCompanySettings();
+  /** Run the refresh and elapsed-time timers exactly while a shift is in progress. */
+  function syncTimers() {
+    if (currentState.value === "not_working") {
+      stopRefreshInterval();
+      stopDurationUpdateInterval();
+      return;
+    }
 
-    // Obtener estado actual
+    updateCurrentDuration();
+
+    if (typeof window === "undefined") return;
+
+    if (!refreshInterval.value) {
+      refreshInterval.value = window.setInterval(() => {
+        // Nothing to ask for without a connection.
+        if (isOnline()) fetchStatus({ silent: true });
+      }, 60000);
+    }
+
+    if (!durationUpdateInterval.value) {
+      durationUpdateInterval.value = window.setInterval(updateCurrentDuration, 30000);
+    }
+  }
+
+  async function initialize() {
+    await fetchCompanySettings();
     await fetchStatus();
 
-    if (status.value?.checkedIn) {
-      startRefreshInterval();
-      startDurationUpdateInterval();
+    // The session and the company rules are known now, which is what a queued entry needs.
+    if (pendingCount.value > 0 && isOnline()) {
+      void syncPendingActions();
     }
 
     return () => {
@@ -734,47 +720,18 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     };
   }
 
-  function getEmployeeId() {
-    return authStore.user?.employeeRecords?.[0]?.id || null;
+  function setOfflineCheckIn(category: ClockInCategory = "shift_start") {
+    applyLocalState(category);
   }
 
-  function setOfflineCheckIn(category: 'shift_start' | 'break_end' | 'offsite_end' = 'shift_start') {
-    let workState: WorkState = 'working';
-    if (category === 'break_end') workState = 'working';
-    if (category === 'offsite_end') workState = 'working';
-
-    currentState.value = workState;
-    lastCategory.value = category;
-
-    status.value = {
-      ...status.value,
-      checkedIn: true,
-      currentCategory: category,
-      currentState: workState,
-      lastCheckIn: new Date().toISOString(),
-    };
-    startDurationUpdateInterval();
+  function setOfflineCheckOut(category: ClockOutCategory = "shift_end") {
+    applyLocalState(category);
   }
 
-  function setOfflineCheckOut(category: 'shift_end' | 'break_start' | 'offsite_start' = 'shift_end') {
-    let workState: WorkState = 'not_working';
-    if (category === 'break_start') workState = 'on_break';
-    if (category === 'offsite_start') workState = 'offsite';
-
-    currentState.value = workState;
-    lastCategory.value = category;
-
-    status.value = {
-      ...status.value,
-      checkedIn: category !== 'shift_end',
-      currentCategory: category,
-      currentState: workState,
-      lastCheckOut: new Date().toISOString(),
-    };
-
-    if (category === 'shift_end') {
-      stopDurationUpdateInterval();
-    }
+  /** Re-read how many entries are waiting in the offline queue. */
+  function refreshPendingCount() {
+    const employeeId = getEmployeeId();
+    pendingCount.value = employeeId ? getPendingActions(employeeId).length : 0;
   }
 
   /**
@@ -788,53 +745,59 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     stopDurationUpdateInterval();
     status.value = null;
     loading.value = false;
+    statusError.value = false;
     checkingIn.value = false;
     checkingOut.value = false;
     currentDuration.value = "";
-    currentState.value = 'not_working';
+    currentState.value = "not_working";
     lastCategory.value = null;
     shiftDate.value = null;
     isNightShift.value = false;
-    effectiveHours.value = null;
-    lastOvertimeRegistered.value = null;
+    pendingCount.value = 0;
+    confirmingEndShift.value = false;
     gettingLocation.value = false;
     locationData.value = null;
     locationError.value = null;
     companySettings.value = {};
   }
+
   return {
     reset,
-    // Estado existente
     status,
     loading,
+    statusError,
     checkingIn,
     checkingOut,
+    isBusy,
     isCheckedIn,
     formattedLastCheckIn,
     formattedLastCheckOut,
     formattedCurrentDuration,
 
-    // Nuevos estados
     currentState,
     lastCategory,
 
-    // Night shift and overtime states
+    // Night shift
     shiftDate,
     isNightShift,
-    effectiveHours,
-    lastOvertimeRegistered,
+    formattedShiftDate,
 
-    // Estado de geolocalización
+    // Offline queue and confirmation
+    pendingCount,
+    confirmingEndShift,
+
+    // Geolocation
     gettingLocation,
     locationData,
     locationError,
     companySettings,
+    settingsLoaded,
+    isRemoteWorker,
     isGeolocationEnabled,
     isGeolocationRequired,
     isGeolocationAvailable: isGeolocationAvailableComputed,
     formattedLocation,
 
-    // Nuevos computed
     canStartShift,
     canEndShift,
     canStartBreak,
@@ -844,7 +807,6 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     stateLabel,
     stateColor,
 
-    // Métodos existentes
     fetchStatus,
     checkIn,
     checkOut,
@@ -852,8 +814,14 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     getEmployeeId,
     setOfflineCheckIn,
     setOfflineCheckOut,
+    refreshPendingCount,
 
-    // Nuevos metodos
+    requestAction,
+    performAction,
+    confirmEndShift,
+    cancelEndShift,
+    submitQueuedAction,
+
     startBreak,
     endBreak,
     startOffsite,
@@ -861,7 +829,6 @@ export const useWorkStatusStore = defineStore("workStatus", () => {
     endShift,
     startShift,
 
-    // Métodos de geolocalización
     fetchCompanySettings,
     getCurrentLocation,
     retryLocation,

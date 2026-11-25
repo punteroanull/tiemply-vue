@@ -81,4 +81,19 @@ describe('pwa update checks', () => {
     expect(() => vi.advanceTimersByTime(2000)).not.toThrow();
     expect(registration.update).toHaveBeenCalledTimes(2);
   });
+
+  it('swallows an update check that rejects', async () => {
+    // What the browser really does offline: update() returns a rejected promise, which a
+    // try/catch does not see. Unhandled, it would fail this test run.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    registration.update.mockImplementation(() => Promise.reject(new Error('offline')));
+
+    scheduleUpdateChecks(registration, { target });
+    fire('visibilitychange');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });

@@ -12,6 +12,9 @@ const { t } = useI18n();
 <template>
   <div
     class="inline-flex items-center gap-1.5"
+    :title="t('workLog.nightShift')"
+    :role="showLabel ? undefined : 'img'"
+    :aria-label="showLabel ? undefined : t('workLog.nightShift')"
     :class="{
       'text-xs': size === 'sm',
       'text-sm': size === 'md' || !size,
@@ -23,6 +26,7 @@ const { t } = useI18n();
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 24 24"
       fill="currentColor"
+      aria-hidden="true"
       class="text-purple-500"
       :class="{
         'w-3.5 h-3.5': size === 'sm',

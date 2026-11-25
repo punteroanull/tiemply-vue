@@ -5,7 +5,6 @@ export interface GeolocationData {
   longitude: number;
   accuracy: number;
   timestamp: number;
-  address?: string;
 }
 
 export interface GeolocationError {
@@ -91,39 +90,6 @@ export function getCurrentPosition(): Promise<GeolocationData> {
 }
 
 /**
- * Obtiene la dirección aproximada usando reverse geocoding (opcional)
- * Nota: Esto requeriría una API externa como Google Maps o OpenStreetMap
- */
-export async function getAddressFromCoords(lat: number, lng: number): Promise<string | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 segundos timeout
-
-  try {
-    // Usando Nominatim (OpenStreetMap) - gratuito pero con límites de uso
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
-      { signal: controller.signal }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch address');
-    }
-
-    const data = await response.json();
-    return data.display_name || null;
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('Geocoding request timed out after 5s');
-    } else {
-      console.warn('Failed to get address from coordinates:', error);
-    }
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-/**
  * Formatea las coordenadas para mostrar al usuario
  */
 export function formatCoordinates(lat: number, lng: number, accuracy?: number): string {
@@ -145,14 +111,24 @@ export function isGeolocationAvailable(): boolean {
  * Verifica si se han otorgado permisos de geolocalización
  */
 export async function checkGeolocationPermission(): Promise<boolean> {
+  return (await getGeolocationPermissionState()) === 'granted';
+}
+
+/**
+ * Estado del permiso de ubicación. `unknown` cuando el navegador no expone la Permissions API
+ * (Safari antiguo): ahí solo se sabe pidiendo la posición. Distinguir `denied` de `prompt`
+ * importa: con el permiso bloqueado volver a pedirlo no hace nada y hay que explicarlo.
+ */
+export type GeolocationPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';
+
+export async function getGeolocationPermissionState(): Promise<GeolocationPermissionState> {
   try {
-    if ('permissions' in navigator) {
+    if (typeof navigator !== 'undefined' && navigator.permissions?.query) {
       const permission = await navigator.permissions.query({ name: 'geolocation' });
-      return permission.state === 'granted';
+      return permission.state as GeolocationPermissionState;
     }
-    return false;
-  } catch (error) {
-    console.warn('Could not check geolocation permission:', error);
-    return false;
+    return 'unknown';
+  } catch {
+    return 'unknown';
   }
 }

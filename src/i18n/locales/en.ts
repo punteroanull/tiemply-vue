@@ -11,6 +11,14 @@ export default {
     profile: 'Profile',
     signOut: 'Sign out',
     yourProfile: 'Your Profile',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    openUserMenu: 'Open user menu',
+    mainNavigation: 'Main navigation',
+    management: 'Management',
+    roleAdmin: 'Administrator',
+    roleManager: 'Manager',
+    roleSupervisor: 'Supervisor',
     language: 'Language',
     employee: 'Employee',
     hourPool: 'Hour Pool'
@@ -37,21 +45,36 @@ export default {
   // Authentication
   auth: {
     signIn: 'Sign in to your account',
-    createAccount: 'Create an account',
     email: 'Email',
     password: 'Password',
     confirmPassword: 'Confirm password',
-    fullName: 'Full name',
-    rememberMe: 'Remember me',
     forgotPassword: 'Forgot your password?',
     signInButton: 'Sign in',
     signingIn: 'Signing in...',
-    createAccountButton: 'Create account',
-    creatingAccount: 'Creating account...',
-    noAccount: "Don't have an account?",
-    hasAccount: 'Already have an account?',
-    register: 'Register',
+    tagline: 'Employee time management',
+    emailPlaceholder: 'your.email@example.com',
+    sessionExpired: 'Your session has expired. Please sign in again.',
+    sessionLoadFailedTitle: 'Your session could not be loaded',
+    sessionLoadFailedBody: 'You may be offline or the server may not be responding. You are still signed in.',
     login: 'Login',
+    reset: {
+      title: 'Reset your password',
+      intro: 'Enter the email of your account and we will send you a link to choose a new password.',
+      send: 'Send reset link',
+      sending: 'Sending...',
+      sent: 'If {email} has an account, a link to reset the password is on its way.',
+      sentHint: 'It can take a few minutes. Check your spam folder too.',
+      requestFailed: 'The reset link could not be requested. Please try again.',
+      backToLogin: 'Back to sign in',
+      newPasswordTitle: 'Choose a new password',
+      newPasswordIntro: 'New password for {email}.',
+      newPassword: 'New password',
+      save: 'Save new password',
+      failed: 'The password could not be changed. Please try again.',
+      linkInvalid: 'This reset link is incomplete or no longer valid.',
+      requestNewLink: 'Request a new link',
+      done: 'Password changed. Sign in with your new password.'
+    },
     validation: {
       emailRequired: 'Email is required',
       passwordRequired: 'Password is required',
@@ -83,6 +106,9 @@ export default {
     leftAt: 'Left at',
     timeOffsite: 'Time offsite',
     lastCheckedOut: 'Last checked out',
+    expectedHours: 'Expected hours',
+    weeklyProgress: 'Weekly progress',
+    weeklyLoadError: 'The weekly summary could not be loaded.',
     notCheckedIn: "You haven't checked in today.",
     pending: 'Pending'
   },
@@ -103,7 +129,39 @@ export default {
     startYourShift: 'Start your shift',
     endYourShift: 'End your shift',
     goOffsiteAction: 'Go offsite',
-    returnToOfficeAction: 'Return to office'
+    returnToOfficeAction: 'Return to office',
+    actionsMenu: 'Clock in and out',
+    elapsed: 'Elapsed time',
+    shiftStartedAt: 'Shift started at {time}',
+    pendingSync: 'No pending entries | 1 entry waiting to sync | {count} entries waiting to sync',
+    confirmEndShiftTitle: 'End your shift?',
+    confirmEndShiftBody: 'Your shift will be closed at the current time. This cannot be undone from the app.',
+    confirmEndShiftAction: 'End shift',
+    notes: {
+      shift_start: 'Started shift via Tiemply app',
+      shift_end: 'Ended shift via Tiemply app',
+      break_start: 'Started break via Tiemply app',
+      break_end: 'Returned from break via Tiemply app',
+      offsite_start: 'Left office (offsite) via Tiemply app',
+      offsite_end: 'Returned to office via Tiemply app'
+    },
+    toasts: {
+      shift_start: 'Shift started',
+      shift_end: 'Shift ended',
+      break_start: 'Break started',
+      break_end: 'Back from break',
+      offsite_start: 'Offsite time started',
+      offsite_end: 'Back at the office',
+      statusError: 'Your current work status could not be loaded',
+      actionFailed: 'The entry could not be recorded. Please try again.',
+      serverError: 'Error {status}: {message}',
+      noEmployee: 'No employee record was found for your user.',
+      savedOffline: 'Saved without connection. It will be recorded with the time at which it syncs, not the current time.',
+      syncDone: 'Nothing to sync | 1 offline entry was synced | {count} offline entries were synced',
+      syncRejected: 'An entry saved offline was rejected: {reason}',
+      syncRejectedGeneric: 'the server did not accept it',
+      syncWaitingLocation: 'Offline entries are still waiting: your location is needed to record them.'
+    }
   },
 
   // Work Logs
@@ -132,6 +190,27 @@ export default {
     exporting: 'Exporting...',
     exportSuccess: 'PDF exported successfully',
     exportError: 'Failed to export PDF',
+    exportNotAvailable: 'PDF export is not included in your company plan.',
+    fetchError: 'The work log report could not be loaded',
+    noEmployee: 'No employee record was found for your user.',
+    daysWorked: 'Days worked',
+    entries: 'No entries | 1 entry | {count} entries',
+    previousPeriod: 'Previous period',
+    nextPeriod: 'Next period',
+    goToDate: 'Go to date',
+    inProgress: 'In progress',
+    types: {
+      check_in: 'Check in',
+      check_out: 'Check out'
+    },
+    categories: {
+      shift_start: 'Shift start',
+      shift_end: 'Shift end',
+      break_start: 'Break start',
+      break_end: 'Break end',
+      offsite_start: 'Left the office',
+      offsite_end: 'Back at the office'
+    },
     duration: 'Duration',
     source: 'Source',
     sourceTypes: {
@@ -144,6 +223,16 @@ export default {
 
   // Absences
   absences: {
+    errors: {
+      fetchTypes: 'The absence types could not be loaded',
+      fetchAbsences: 'Your absences could not be loaded'
+    },
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+    legendVacation: 'Vacation',
+    legendSick: 'Sick leave',
+    legendPersonal: 'Personal leave',
+    legendOther: 'Other',
     title: 'Absences',
     viewAndFilter: 'View and filter your absences',
     list: 'List',
@@ -171,6 +260,23 @@ export default {
 
   // Requests
   requests: {
+    status: {
+      pending: 'Pending',
+      approved: 'Approved',
+      rejected: 'Rejected',
+      partial: 'Partial'
+    },
+    noResultsByStatus: {
+      pending: 'There are no pending requests.',
+      approved: 'There are no approved requests.',
+      rejected: 'There are no rejected requests.',
+      partial: 'There are no partially approved requests.'
+    },
+    errors: {
+      fetch: 'The requests could not be loaded',
+      fetchOne: 'The request could not be loaded'
+    },
+    typeLocked: 'The absence type cannot be changed. To request a different type, cancel this request and create a new one.',
     title: 'Absence Requests',
     newRequest: 'New Request',
     all: 'All',
@@ -221,6 +327,32 @@ export default {
 
   // Team Requests (Managers)
   teamRequests: {
+    errors: {
+      fetch: 'The team requests could not be loaded',
+      review: 'The review could not be saved'
+    },
+    empty: {
+      pending: {
+        title: 'Nothing waiting for review',
+        description: 'When someone on your team sends a request it will show up here.'
+      },
+      reviewed: {
+        title: 'No reviewed requests yet',
+        description: 'Approved and rejected requests will show up here.'
+      },
+      all: {
+        title: 'No team requests',
+        description: 'Your team has not sent any request yet.'
+      }
+    },
+    ownRequest: 'This is your own request: someone else has to review it.',
+    rejectionReasonRequired: 'Give a reason for the rejection.',
+    approveRequestSuccess: 'Request approved successfully',
+    rejectRequestSuccess: 'Request rejected successfully',
+    confirmApproveTitle: 'Confirm approval',
+    confirmApprovePeriod: 'Approve the period {dates}?',
+    confirmApproveRequest: 'Approve the request from {name}?',
+    confirmApproveHint: 'Approving records the absences and deducts the days. It cannot be undone from here.',
     title: 'Team Requests',
     pendingReview: 'Pending Review',
     reviewed: 'Reviewed',
@@ -246,6 +378,18 @@ export default {
 
   // New Request
   newRequest: {
+    serverErrorsTitle: 'The request could not be saved:',
+    validation: {
+      selectType: 'Select an absence type.',
+      datesRequired: 'Enter the start and end dates.',
+      endBeforeStart: 'The end date cannot be before the start date.',
+      timesRequired: 'Enter the start and end time of the partial absence.',
+      endTimeBeforeStart: 'The end time must be after the start time.',
+      periodsOverlap: 'This period overlaps another one in the same request.',
+      noWorkingDays: 'The dates chosen do not include any working day.',
+      startTooEarly: 'The start date cannot be earlier than {date}.'
+    },
+    businessDaysHint: 'Only working days (Monday to Friday) are counted.',
     title: 'New Absence Request',
     backToRequests: 'Back to requests',
     absenceType: 'Absence Type',
@@ -289,15 +433,21 @@ export default {
     status: 'Status',
     active: 'Active',
     inactive: 'Inactive',
-    notProvided: 'Not provided'
+    notProvided: 'Not provided',
+    address: 'Address',
+    saving: 'Saving...',
+    companyManagedHint: 'Your email, ID number and role are managed by your company.',
+    changePassword: 'Change password',
+    changePasswordHint: 'Changing it signs you out on your other devices.',
+    currentPassword: 'Current password',
+    newPassword: 'New password',
+    passwordMustDiffer: 'The new password must be different from the current one'
   },
 
   // Toast messages
   messages: {
     loginSuccess: 'Successfully logged in',
     loginFailed: 'Login failed',
-    registerSuccess: 'Registration successful',
-    registerFailed: 'Registration failed',
     logoutSuccess: 'Logged out successfully',
     profileUpdated: 'Profile updated successfully',
     profileUpdateFailed: 'Failed to update profile',
@@ -306,7 +456,12 @@ export default {
     fetchError: 'Failed to fetch data',
     savedOffline: 'Saved for syncing when connection is restored',
     invalidResponse: 'Invalid response from server',
-    locationReady: 'Location ready',
+    pageNotFound: 'Page not found',
+    pageNotFoundBody: 'The page you are looking for does not exist or has moved.',
+    backToHome: 'Back to home',
+    backToOwnAccount: 'Back to your own account',
+    impersonationLinkInvalid: 'The access link is no longer valid',
+    locationReady:'Location ready',
     locationError: 'Location error',
     locationPending: 'Location pending',
     gettingLocation: 'Getting location...',
@@ -330,7 +485,14 @@ export default {
     next: 'Next',
     required: 'required',
     optional: 'optional',
-    allRightsReserved: 'All rights reserved'
+    allRightsReserved: 'All rights reserved',
+    loadError: 'The data could not be loaded',
+    loadErrorHint: 'Check your connection and try again.',
+    retry: 'Retry',
+    unknown: 'Unknown',
+    apply: 'Apply',
+    previous: 'Previous',
+    today: 'Today'
   },
 
   // Language selector
@@ -343,6 +505,19 @@ export default {
 
   // Department
   department: {
+    errors: {
+      fetchDepartment: 'The department could not be loaded',
+      fetchEmployees: 'The employees could not be loaded',
+      fetchCalendar: 'The calendar could not be loaded',
+      fetchAbsences: 'The absences could not be loaded',
+      fetchRequests: 'The requests could not be loaded',
+      fetchWorkLogs: 'The work logs could not be loaded'
+    },
+    validation: {
+      selectEmployee: 'Select an employee.',
+      dateRequired: 'Enter the date of the absence.'
+    },
+    reviewRequests: 'Review requests',
     section: 'Department',
     title: 'My Department',
     myDepartment: 'My Department',
@@ -424,7 +599,8 @@ export default {
       split: 'Split Shift',
       night: 'Night Shift',
       guard: 'On-Call',
-      rotating: 'Rotating'
+      rotating: 'Rotating',
+      flexible: 'Flexible hours'
     },
     block: 'Block',
     startTime: 'Start',
@@ -435,7 +611,21 @@ export default {
     nextDay: '(next day)',
     noBlocksToday: 'No schedule blocks today',
     effectiveFrom: 'Effective from',
-    effectiveUntil: 'Effective until'
+    effectiveUntil: 'Effective until',
+    restDay: 'No shift',
+    contractSchedule: 'Contract hours',
+    contractScheduleDescription: 'You have no block schedule assigned; your contract hours apply.',
+    contractHours: 'Hours',
+    dailyHours: 'Daily hours',
+    flexibleDescription: 'You have no fixed timetable: you must complete a minimum number of hours each period.',
+    requiredHoursWeek: '{hours} per week',
+    requiredHoursMonth: '{hours} per month',
+    flexiblePeriod: 'Period from {start} to {end}',
+    flexibleWorked: 'Worked this period',
+    flexibleRemaining: 'Remaining',
+    notAvailableOnPlan: 'Schedules not available',
+    notAvailableOnPlanDescription: 'Schedules are not included in your company plan.',
+    weekNavigation: 'Week navigation'
   },
 
   // Overtime
@@ -467,7 +657,14 @@ export default {
     filterByMonth: 'Filter by month',
     allStatuses: 'All statuses',
     allMonths: 'All months',
-    year: 'Year'
+    year: 'Year',
+    noResults: 'No results',
+    noResultsDescription: 'No records match the selected filters.',
+    noLimit: 'No annual limit configured',
+    limitProgress: 'Approved overtime against the annual limit',
+    totalHoursHint: 'Approved + pending',
+    notAvailableOnPlan: 'Overtime not available',
+    notAvailableOnPlanDescription: 'Overtime is not included in your company plan.'
   },
 
   // Incidents
@@ -477,7 +674,8 @@ export default {
       unclosed_shift: 'Unclosed Shift',
       late_arrival: 'Late Arrival',
       early_departure: 'Early Departure',
-      missing_checkout: 'Missing Checkout'
+      missing_checkout: 'Missing Checkout',
+      manual_adjustment: 'Manual adjustment'
     },
     statuses: {
       pending: 'Pending',
@@ -496,6 +694,10 @@ export default {
     resolvedBy: 'Resolved by',
     resolvedAt: 'Resolved at',
     resolutionNotes: 'Resolution notes',
+    noResults: 'No results',
+    noResultsDescription: 'No incidents match the selected filters.',
+    pageOf: 'Page {page} of {total}',
+    pagination: 'Incident pagination',
     filterByType: 'Filter by type',
     filterByStatus: 'Filter by status',
     allTypes: 'All types',
@@ -534,6 +736,17 @@ export default {
     source: 'Source',
     description: 'Description',
     createdBy: 'Created by',
+    amount: 'Amount',
+    filterByType: 'Filter by type',
+    filterBySource: 'Filter by source',
+    allTimeBalanceHint: 'The balance is the running total since the start. The year filters the entries and the pending overtime.',
+    yearActivity: 'Activity in {year}',
+    yearNet: 'Net',
+    noResults: 'No results',
+    noResultsDescription: 'No entries match the selected year and filters.',
+    notAvailableOnPlan: 'Hour pool not available',
+    notAvailableOnPlanDescription: 'The hour pool is not included in your company plan.',
+    pagination: 'Entry pagination',
     actions: 'Actions',
     notAvailable: 'Hour Pool not available',
     notAvailableDescription: 'The hour pool is not available for employees in this company.',
@@ -560,7 +773,12 @@ export default {
       employees: 'Employees',
       employee: 'Employee',
       employeeBreakdown: 'Employee Breakdown',
-      noEmployees: 'No employee data available'
+      noEmployees: 'No employee data available',
+      search: 'Search employee',
+      noMatches: 'No employee matches the search.',
+      noAccess: 'Summary not available',
+      noAccessDescription: 'Only company administrators and managers can see this summary.',
+      onlyWithEntries: 'Only employees with hour pool entries are listed.'
     },
     adjustment: {
       button: 'Adjust',
@@ -568,11 +786,21 @@ export default {
       descriptionPlaceholder: 'Reason for adjustment...',
       minutesRequired: 'Minutes must be at least 1',
       descriptionRequired: 'Description is required',
-      success: 'Adjustment created successfully'
+      success: 'Adjustment created successfully',
+      error: 'The adjustment could not be created',
+      newButton: 'New adjustment',
+      employee: 'Employee',
+      selectEmployee: 'Select an employee',
+      employeeRequired: 'Select an employee',
+      loadEmployeesError: 'The employee list could not be loaded',
+      equivalent: 'Equals {duration}',
+      confirmCredit: '{duration} will be added to the pool of {name}.',
+      confirmDebit: '{duration} will be deducted from the pool of {name}.',
+      confirmQuestion: 'Confirm this adjustment?'
     }
   },
 
-  // Geolocation
+  // PWA
   pwa: {
     updateAvailable: {
       title: 'A new version is available',
@@ -616,7 +844,6 @@ export default {
     troubleshooting: 'Troubleshooting',
     lastKnownLocation: 'Last Known Location',
     coordinates: 'Coordinates',
-    address: 'Address',
     obtained: 'Obtained',
     troubleshootingIntro: "If you're having trouble with location permissions:",
     troubleshootingStep1: "Click the location icon in your browser's address bar",
@@ -628,6 +855,9 @@ export default {
     locationPending: 'Location pending',
     retry: 'Retry',
     gettingLocation: 'Getting location…',
+    permissionBlocked: 'Location access is blocked for this site. Allow it from the padlock icon in the address bar and try again.',
+    statusGranted: 'Location permission granted',
+    statusUnknown: 'Location permission not requested yet',
     errors: {
       notSupported: 'Your browser cannot provide your location. Open the app in an up-to-date Chrome or Safari and check the address starts with https.',
       permissionDenied: 'you have blocked location access. Tap the padlock icon in the address bar and allow location for this site.',

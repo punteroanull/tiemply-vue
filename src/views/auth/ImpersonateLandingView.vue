@@ -10,6 +10,7 @@ const authStore = useAuthStore();
 const { t } = useI18n();
 
 const failed = ref(false);
+const adminUrl: string | undefined = import.meta.env.VITE_ADMIN_URL;
 
 onMounted(async () => {
   const code = typeof route.query.code === 'string' ? route.query.code : null;
@@ -47,8 +48,14 @@ onMounted(async () => {
       </template>
 
       <template v-else>
-        <p class="text-base font-medium text-neutral-900">{{ t('impersonation.landing.failedTitle') }}</p>
+        <p role="alert" class="text-base font-medium text-neutral-900">{{ t('impersonation.landing.failedTitle') }}</p>
         <p class="mt-2 text-sm text-neutral-600">{{ t('impersonation.landing.failedBody') }}</p>
+        <a v-if="adminUrl" :href="adminUrl" class="btn-primary inline-flex mt-6">
+          {{ t('common.back') }}
+        </a>
+        <router-link v-else to="/login" class="btn-primary inline-flex mt-6">
+          {{ t('invitation.goToLogin') }}
+        </router-link>
       </template>
     </div>
   </div>

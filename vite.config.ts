@@ -41,10 +41,11 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "pwa-512x512.png",
+            // Full-bleed version: launchers crop maskable icons to their own shape.
+            src: "pwa-maskable-512x512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
+            purpose: "maskable",
           },
         ],
         start_url: "/",
@@ -54,20 +55,9 @@ export default defineConfig({
       workbox: {
         // Drop precaches from previous builds instead of letting them pile up on phones
         cleanupOutdatedCaches: true,
-        // Configuración para cachear recursos y API
-        runtimeCaching: [
-          {
-            urlPattern: new RegExp("^http://localhost:8000/api/"), // Ajusta a tu API
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "api-cache",
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 1 día
-              },
-            },
-          },
-        ],
+        // No runtime cache for the API on purpose: its responses are per-user and
+        // authenticated, and a cache keyed by URL alone would hand one person's data to
+        // the next one signing in on the same device.
       },
     }),
   ],

@@ -51,14 +51,14 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "Test User",
         email: "test@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
         role: {
           id: "1",
           uuid: "role-uuid-1",
           name: "Administrator",
-          is_exempt: true,
-          access_level: 100,
+          isExempt: true,
+          accessLevel: 100,
         },
       };
 
@@ -149,8 +149,8 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "Test User",
         email: "test@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
       };
       localStorage.setItem("token", "test-token");
 
@@ -174,8 +174,8 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "John Doe",
         email: "john@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
       };
 
       expect(store.getUserInitials()).toBe("JD");
@@ -189,14 +189,14 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "John Doe",
         email: "john@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
         role: {
           id: "1",
           uuid: "role-uuid-1",
           name: "Manager",
-          is_exempt: false,
-          access_level: 50,
+          isExempt: false,
+          accessLevel: 50,
         },
       };
 
@@ -211,14 +211,14 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "Test User",
         email: "test@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
         role: {
           id: "1",
           uuid: "role-uuid-1",
           name: "Employee",
-          is_exempt: false,
-          access_level: 10,
+          isExempt: false,
+          accessLevel: 10,
         },
       };
 
@@ -234,14 +234,14 @@ describe("Auth Store", () => {
         uuid: "uuid-1",
         name: "Test User",
         email: "test@example.com",
-        created_at: "2024-01-01",
-        updated_at: "2024-01-01",
+        createdAt: "2024-01-01",
+        updatedAt: "2024-01-01",
         role: {
           id: "1",
           uuid: "role-uuid-1",
           name: "Manager",
-          is_exempt: false,
-          access_level: 50,
+          isExempt: false,
+          accessLevel: 50,
         },
       };
 

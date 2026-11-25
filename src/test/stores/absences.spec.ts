@@ -10,12 +10,17 @@ vi.mock('vue-toastification', () => ({
   }),
 }));
 
+const fetchCurrentUser = vi.fn();
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     user: {
       id: 'user-123',
-      employeeRecords: [{ id: 'employee-123' }],
+      // The first record is a closed employment: the store must not pick it by position.
+      employeeRecords: [{ id: 'employee-old', active: false }, { id: 'employee-123', active: true }],
     },
+    currentEmployee: { id: 'employee-123', active: true },
+    fetchCurrentUser,
   }),
 }));
 
@@ -212,6 +217,158 @@ describe('absences Store', () => {
         rejection_reason: 'Team is short-staffed',
       });
       expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+    });
+  });
+
+  describe('failed fetches', () => {
+    it('flags a failed request list instead of leaving it looking empty', async () => {
+      vi.mocked(mockApi.get).mockRejectedValueOnce({ response: { status: 500, data: {} } });
+
+      const store = useAbsencesStore();
+      await store.fetchAbsenceRequests();
+
+      expect(store.requestsError).toBe(true);
+      expect(store.loading).toBe(false);
+    });
+
+    it('clears the flag once the list loads again', async () => {
+      vi.mocked(mockApi.get)
+        .mockRejectedValueOnce({ response: { status: 500, data: {} } })
+        .mockResolvedValueOnce({ data: { success: true, data: [{ id: 'req-1' }] } });
+
+      const store = useAbsencesStore();
+      await store.fetchAbsenceRequests();
+      await store.fetchAbsenceRequests();
+
+      expect(store.requestsError).toBe(false);
+      expect(store.requests).toEqual([{ id: 'req-1' }]);
+    });
+
+    it('flags failed absences and failed team requests separately', async () => {
+      vi.mocked(mockApi.get).mockRejectedValue({ response: { status: 500, data: {} } });
+
+      const store = useAbsencesStore();
+      await store.fetchAbsences();
+      await store.fetchTeamPendingRequests();
+
+      expect(store.absencesError).toBe(true);
+      expect(store.teamRequestsError).toBe(true);
+      expect(store.requestsError).toBe(false);
+    });
+  });
+
+  describe('balance refresh', () => {
+    it('reloads the user after submitting, so the vacation balance is current', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValue({ data: [] });
+
+      const store = useAbsencesStore();
+      await store.submitAbsenceRequest({ absence_type_id: 'type-1' });
+
+      expect(fetchCurrentUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reload the user when the submission fails', async () => {
+      vi.mocked(mockApi.post).mockRejectedValueOnce({
+        response: { status: 422, data: { message: 'Not enough days' } },
+      });
+
+      const store = useAbsencesStore();
+      const result = await store.submitAbsenceRequest({ absence_type_id: 'type-1' });
+
+      expect(result).toBe(false);
+      expect(fetchCurrentUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('cancelRequest', () => {
+    it('deletes the request, refetches the lists and reloads the balance', async () => {
+      vi.mocked(mockApi.delete).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValue({ data: [] });
+
+      const store = useAbsencesStore();
+      const result = await store.cancelRequest('req-1');
+
+      expect(result).toBe(true);
+      expect(mockApi.delete).toHaveBeenCalledWith('/requests/req-1');
+      expect(mockApi.get).toHaveBeenCalledWith('/employees/employee-123/absence-requests');
+      expect(fetchCurrentUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns false when the API refuses (already under review)', async () => {
+      vi.mocked(mockApi.delete).mockRejectedValueOnce({
+        response: { status: 422, data: { message: 'Only pending requests can be deleted' } },
+      });
+
+      const store = useAbsencesStore();
+
+      expect(await store.cancelRequest('req-1')).toBe(false);
+      expect(mockApi.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('whole-request review', () => {
+    it('approves a request without periods through /requests/approve', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      const result = await store.approveRequest('req-1');
+
+      expect(result).toBe(true);
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/approve', { request_id: 'req-1' });
+      expect(mockApi.get).toHaveBeenCalledWith('/requests/pending');
+    });
+
+    it('rejects a request without periods with request_id and rejection_reason', async () => {
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockResolvedValueOnce({ data: { success: true, data: [] } });
+
+      const store = useAbsencesStore();
+      await store.rejectRequest('req-1', 'No cover');
+
+      expect(mockApi.post).toHaveBeenCalledWith('/requests/reject', {
+        request_id: 'req-1',
+        rejection_reason: 'No cover',
+      });
+    });
+
+    it('refreshes the list without the page-wide loading flag', async () => {
+      let loadingDuringRefetch: boolean | null = null;
+      const store = useAbsencesStore();
+      vi.mocked(mockApi.post).mockResolvedValueOnce({ data: { success: true } });
+      vi.mocked(mockApi.get).mockImplementationOnce(async () => {
+        loadingDuringRefetch = store.loading;
+        return { data: { success: true, data: [] } };
+      });
+
+      await store.approveAllPeriods('req-1');
+
+      expect(loadingDuringRefetch).toBe(false);
+    });
+  });
+
+  describe('fetchTeamReviewedRequests', () => {
+    it('merges approved and rejected requests, newest review first', async () => {
+      vi.mocked(mockApi.get).mockImplementation(async (_url: string, config?: any) => ({
+        data: {
+          success: true,
+          data:
+            config?.params?.status === 'approved'
+              ? [{ id: 'approved-1', status: 'approved', reviewedAt: '2026-11-01T10:00:00Z' }]
+              : [{ id: 'rejected-1', status: 'rejected', reviewedAt: '2026-11-05T10:00:00Z' }],
+        },
+      }));
+
+      const store = useAbsencesStore();
+      await store.fetchTeamReviewedRequests();
+
+      expect(mockApi.get).toHaveBeenCalledWith('/requests', { params: { status: 'approved' } });
+      expect(mockApi.get).toHaveBeenCalledWith('/requests', { params: { status: 'rejected' } });
+      expect(store.teamReviewedRequests.map((request) => request.id)).toEqual([
+        'rejected-1',
+        'approved-1',
+      ]);
     });
   });
 });

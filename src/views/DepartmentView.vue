@@ -3,6 +3,8 @@ import { ref, onMounted, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useDepartmentsStore } from "../stores/departments";
 import { useAuthStore } from "../stores/auth";
+import ErrorState from "../components/ErrorState.vue";
+import { apiDateToYmd, formatLocalized } from "../utils/apiDates";
 import {
   format,
   startOfMonth,
@@ -13,13 +15,13 @@ import {
   startOfWeek,
   endOfWeek,
 } from "date-fns";
-import { enUS, es } from "date-fns/locale";
 
-const { locale } = useI18n();
+const { t } = useI18n();
 const departmentsStore = useDepartmentsStore();
 const authStore = useAuthStore();
 
-const loading = computed(() => departmentsStore.loading);
+// Only the first load swaps the page for a spinner; the calendar has its own.
+const initialLoading = ref(true);
 const department = computed(() => departmentsStore.department);
 const employees = computed(() => departmentsStore.employees);
 const calendarData = computed(() => departmentsStore.calendarData);
@@ -27,19 +29,11 @@ const isSupervisor = computed(() => departmentsStore.isSupervisor);
 const canManage = computed(() => departmentsStore.canManageDepartment);
 const hasDepartment = computed(() => !!authStore.currentDepartmentId);
 
-const currentDate = ref(new Date());
-const dateLocale = computed(() => (locale.value === "es" ? es : enUS));
-const currentMonth = computed(() =>
-  format(currentDate.value, "MMMM yyyy", { locale: dateLocale.value })
-);
+/** The team calendar is for whoever manages the department, on plans that include it. */
+const showCalendar = computed(() => canManage.value && departmentsStore.calendarAvailable);
 
-// Days of the week
-const weekDays = computed(() => {
-  if (locale.value === "es") {
-    return ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
-  }
-  return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-});
+const currentDate = ref(new Date());
+const currentMonth = computed(() => formatLocalized(currentDate.value, "MMMM yyyy"));
 
 // Calendar days
 const calendarDays = computed(() => {
@@ -50,13 +44,34 @@ const calendarDays = computed(() => {
   return eachDayOfInterval({ start: startDate, end: endDate });
 });
 
+// Days of the week, in the app language (the grid always starts on Monday)
+const weekDays = computed(() =>
+  calendarDays.value.slice(0, 7).map((day) => ({
+    short: formatLocalized(day, "EEEEEE"),
+    long: formatLocalized(day, "EEEE"),
+  }))
+);
+
+// Absences grouped by calendar day
+const absencesByDay = computed(() => {
+  const byDay = new Map<string, NonNullable<typeof calendarData.value>["calendar"][number]["absences"]>();
+  (calendarData.value?.calendar ?? []).forEach((day) => {
+    const key = apiDateToYmd(day.date);
+    if (key) byDay.set(key, day.absences ?? []);
+  });
+  return byDay;
+});
+
 // Get absences for a specific day
 function getAbsencesForDay(day: Date) {
-  const dayStr = format(day, "yyyy-MM-dd");
-  const calendarDay = calendarData.value?.calendar?.find(
-    (d) => d.date === dayStr
-  );
-  return calendarDay?.absences || [];
+  return absencesByDay.value.get(format(day, "yyyy-MM-dd")) ?? [];
+}
+
+/** Who is away that day, in words (the dots alone say nothing to a screen reader). */
+function getDaySummary(day: Date): string {
+  return getAbsencesForDay(day)
+    .map((absence) => `${absence.employee?.name ?? t("common.unknown")} (${absence.type?.name ?? t("absences.absence")})`)
+    .join(", ");
 }
 
 // Navigation
@@ -80,6 +95,7 @@ function goToToday() {
 }
 
 function loadCalendar() {
+  if (!canManage.value) return;
   const year = currentDate.value.getFullYear();
   const month = currentDate.value.getMonth() + 1;
   departmentsStore.fetchCalendar(year, month);
@@ -112,26 +128,38 @@ function getAbsenceColor(type?: { code?: string }) {
 
 // Get employee name helper
 function getEmployeeName(employee: any): string {
-  return employee?.user?.name || employee?.name || "Unknown";
+  return employee?.user?.name || employee?.name || t("common.unknown");
 }
 
-onMounted(async () => {
-  if (hasDepartment.value) {
+/** Clock-in status only exists in the list supervisors get; undefined means "not known". */
+function knowsClockIn(employee: { hasClockedInToday?: boolean }): boolean {
+  return typeof employee.hasClockedInToday === "boolean";
+}
+
+async function load() {
+  if (!hasDepartment.value) {
+    initialLoading.value = false;
+    return;
+  }
+
+  try {
     await departmentsStore.fetchDepartment();
+    // Plain members read the list that comes with the department; the detailed list and
+    // the calendar are only requested for whoever manages it (the API refuses the rest).
     await departmentsStore.fetchEmployees();
     loadCalendar();
+  } finally {
+    initialLoading.value = false;
   }
-});
+}
+
+onMounted(load);
 
 // Reload when department changes
 watch(
   () => authStore.currentDepartmentId,
-  async (newId) => {
-    if (newId) {
-      await departmentsStore.fetchDepartment();
-      await departmentsStore.fetchEmployees();
-      loadCalendar();
-    }
+  (newId, oldId) => {
+    if (newId && newId !== oldId) load();
   }
 );
 </script>
@@ -148,9 +176,17 @@ watch(
       </p>
     </div>
 
+    <!-- Loading state -->
+    <div v-if="initialLoading" class="flex justify-center items-center h-64" role="status">
+      <div
+        class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"
+      ></div>
+      <span class="sr-only">{{ $t("common.loading") }}</span>
+    </div>
+
     <!-- No Department State -->
     <div
-      v-if="!hasDepartment && !loading"
+      v-else-if="!hasDepartment"
       class="bg-white rounded-lg shadow p-8 text-center"
     >
       <div
@@ -161,6 +197,7 @@ watch(
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
+          aria-hidden="true"
         >
           <path
             stroke-linecap="round"
@@ -178,14 +215,17 @@ watch(
       </p>
     </div>
 
-    <!-- Loading state -->
-    <div v-else-if="loading" class="flex justify-center items-center h-64">
-      <div
-        class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"
-      ></div>
-    </div>
+    <!-- Error state: the department could not be loaded -->
+    <ErrorState
+      v-else-if="departmentsStore.departmentError && !department"
+      @retry="load"
+    />
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div
+      v-else
+      class="grid grid-cols-1 gap-6"
+      :class="showCalendar ? 'lg:grid-cols-3' : 'lg:grid-cols-2'"
+    >
       <!-- Department Info Card -->
       <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-medium text-neutral-800 mb-4">
@@ -273,13 +313,16 @@ watch(
             <div class="relative">
               <div
                 class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm"
+                aria-hidden="true"
               >
                 {{ getEmployeeName(employee).charAt(0).toUpperCase() }}
               </div>
               <span
+                v-if="knowsClockIn(employee)"
                 class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white"
-                :class="employee.hasClockedInToday ? 'bg-green-500' : 'bg-red-500'"
+                :class="employee.hasClockedInToday ? 'bg-green-500' : 'bg-neutral-400'"
                 :title="employee.hasClockedInToday ? $t('department.clockedIn') : $t('department.notClockedIn')"
+                aria-hidden="true"
               ></span>
             </div>
             <div class="ml-3 flex-1 min-w-0">
@@ -288,6 +331,14 @@ watch(
               </p>
               <p class="text-xs text-neutral-500 truncate">
                 {{ employee.user?.email || "" }}
+              </p>
+              <!-- The same information as the dot, in words -->
+              <p
+                v-if="knowsClockIn(employee)"
+                class="text-xs"
+                :class="employee.hasClockedInToday ? 'text-green-700' : 'text-neutral-500'"
+              >
+                {{ employee.hasClockedInToday ? $t("department.clockedIn") : $t("department.notClockedIn") }}
               </p>
             </div>
             <span
@@ -301,19 +352,25 @@ watch(
       </div>
 
       <!-- Department Calendar -->
-      <div class="lg:col-span-1 bg-white rounded-lg shadow overflow-hidden">
+      <div
+        v-if="showCalendar"
+        class="lg:col-span-1 bg-white rounded-lg shadow overflow-hidden"
+      >
         <div
           class="flex justify-between items-center p-4 border-b border-neutral-200"
         >
           <button
+            type="button"
             @click="previousMonth"
-            class="p-2 rounded-full hover:bg-neutral-100 transition-colors"
+            class="p-2.5 rounded-full hover:bg-neutral-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            :aria-label="$t('absences.previousMonth')"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 text-neutral-600"
               viewBox="0 0 20 20"
               fill="currentColor"
+              aria-hidden="true"
             >
               <path
                 fill-rule="evenodd"
@@ -323,25 +380,29 @@ watch(
             </svg>
           </button>
           <div class="flex items-center gap-2">
-            <h3 class="text-sm font-medium text-neutral-800 capitalize">
+            <h3 class="text-sm font-medium text-neutral-800 capitalize" aria-live="polite">
               {{ currentMonth }}
             </h3>
             <button
+              type="button"
               @click="goToToday"
               class="text-xs text-primary-600 hover:text-primary-700"
             >
-              {{ $t("workLogs.today") }}
+              {{ $t("common.today") }}
             </button>
           </div>
           <button
+            type="button"
             @click="nextMonth"
-            class="p-2 rounded-full hover:bg-neutral-100 transition-colors"
+            class="p-2.5 rounded-full hover:bg-neutral-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            :aria-label="$t('absences.nextMonth')"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="h-5 w-5 text-neutral-600"
               viewBox="0 0 20 20"
               fill="currentColor"
+              aria-hidden="true"
             >
               <path
                 fill-rule="evenodd"
@@ -352,14 +413,20 @@ watch(
           </button>
         </div>
 
-        <div class="grid grid-cols-7">
+        <!-- Changing month dims the grid instead of blanking the page -->
+        <div
+          class="grid grid-cols-7 transition-opacity"
+          :class="{ 'opacity-50': departmentsStore.calendarLoading }"
+          :aria-busy="departmentsStore.calendarLoading"
+        >
           <!-- Week headers -->
           <div
             v-for="day in weekDays"
-            :key="day"
-            class="py-2 text-center text-xs font-medium text-neutral-500 border-b"
+            :key="day.long"
+            class="py-2 text-center text-xs font-medium text-neutral-500 border-b capitalize"
           >
-            {{ day }}
+            <span aria-hidden="true">{{ day.short }}</span>
+            <span class="sr-only">{{ day.long }}</span>
           </div>
 
           <!-- Calendar days -->
@@ -368,21 +435,23 @@ watch(
             :key="index"
             class="h-14 border-b border-r border-neutral-100 p-1 relative"
             :class="getDayClass(day)"
+            :title="getDaySummary(day) || undefined"
           >
             <div class="text-xs text-right">
               {{ format(day, "d") }}
             </div>
+            <span v-if="getAbsencesForDay(day).length" class="sr-only">{{ getDaySummary(day) }}</span>
 
             <!-- Absence indicators -->
             <div
-              class="absolute bottom-1 left-1 right-1 flex flex-wrap gap-0.5"
+              class="absolute bottom-1 left-1 right-1 flex flex-wrap items-center gap-0.5"
+              aria-hidden="true"
             >
               <div
                 v-for="(absence, i) in getAbsencesForDay(day).slice(0, 3)"
                 :key="i"
-                class="h-1.5 w-1.5 rounded-full"
+                class="h-2 w-2 rounded-full"
                 :class="getAbsenceColor(absence.type)"
-                :title="absence.employee?.name"
               ></div>
               <span
                 v-if="getAbsencesForDay(day).length > 3"
@@ -397,22 +466,20 @@ watch(
         <!-- Legend -->
         <div class="p-3 border-t border-neutral-200 flex flex-wrap gap-3">
           <div class="flex items-center gap-1">
-            <div class="h-2 w-2 rounded-full bg-blue-500"></div>
-            <span class="text-xs text-neutral-600">{{
-              $t("absences.vacationAvailable").split(" ")[0]
-            }}</span>
+            <div class="h-2 w-2 rounded-full bg-blue-500" aria-hidden="true"></div>
+            <span class="text-xs text-neutral-600">{{ $t("absences.legendVacation") }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <div class="h-2 w-2 rounded-full bg-red-500"></div>
-            <span class="text-xs text-neutral-600">{{
-              locale === "es" ? "Enfermedad" : "Sick"
-            }}</span>
+            <div class="h-2 w-2 rounded-full bg-red-500" aria-hidden="true"></div>
+            <span class="text-xs text-neutral-600">{{ $t("absences.legendSick") }}</span>
           </div>
           <div class="flex items-center gap-1">
-            <div class="h-2 w-2 rounded-full bg-neutral-500"></div>
-            <span class="text-xs text-neutral-600">{{
-              locale === "es" ? "Otros" : "Other"
-            }}</span>
+            <div class="h-2 w-2 rounded-full bg-purple-500" aria-hidden="true"></div>
+            <span class="text-xs text-neutral-600">{{ $t("absences.legendPersonal") }}</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <div class="h-2 w-2 rounded-full bg-neutral-500" aria-hidden="true"></div>
+            <span class="text-xs text-neutral-600">{{ $t("absences.legendOther") }}</span>
           </div>
         </div>
       </div>

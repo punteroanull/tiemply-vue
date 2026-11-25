@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import api from "../services/api";
-import { useToast } from "vue-toastification";
 import { useAuthStore } from "./auth";
+import { unwrapList, unwrapPageMeta } from "../utils/apiResponse";
+import type { PageMeta } from "../utils/apiResponse";
 import type {
   Incident,
   IncidentFilters,
@@ -11,24 +12,18 @@ import type {
 } from "../types";
 
 export const useIncidentsStore = defineStore("incidents", () => {
-  const toast = useToast();
   const authStore = useAuthStore();
 
   // State
   const incidents = ref<Incident[]>([]);
+  const pageMeta = ref<PageMeta | null>(null);
+  /** Pending incidents of the employee across every page, whatever filter is on screen. */
+  const pendingTotal = ref(0);
   const loading = ref(false);
+  const error = ref(false);
 
-  // Helper function to extract array data from API response
-  function extractArrayData<T>(response: any): T[] {
-    let data;
-    if (response.data && typeof response.data === "object" && "data" in response.data) {
-      data = response.data.data;
-    } else {
-      data = response.data;
-    }
-    // Ensure we always return an array
-    return Array.isArray(data) ? data : [];
-  }
+  // Only the latest request may write, so a slow older response cannot replace a newer one.
+  let requestId = 0;
 
   // Computed
   const pendingIncidents = computed(() =>
@@ -47,9 +42,13 @@ export const useIncidentsStore = defineStore("incidents", () => {
     incidents.value.filter((i) => i.status === "marked_absence")
   );
 
-  const pendingCount = computed(() => pendingIncidents.value.length);
+  const pendingCount = computed(() => pendingTotal.value);
 
   const hasPendingIncidents = computed(() => pendingCount.value > 0);
+
+  const currentPage = computed(() => pageMeta.value?.currentPage ?? 1);
+  const totalPages = computed(() => pageMeta.value?.lastPage ?? 1);
+  const totalIncidents = computed(() => pageMeta.value?.total ?? incidents.value.length);
 
   // Group by type
   const incidentsByType = computed(() => {
@@ -58,6 +57,7 @@ export const useIncidentsStore = defineStore("incidents", () => {
       late_arrival: [],
       early_departure: [],
       missing_checkout: [],
+      manual_adjustment: [],
     };
 
     incidents.value.forEach((incident) => {
@@ -87,39 +87,82 @@ export const useIncidentsStore = defineStore("incidents", () => {
     return grouped;
   });
 
+  function buildParams(employeeId: string, filters?: IncidentFilters): URLSearchParams {
+    const params = new URLSearchParams();
+    params.append("employee_id", employeeId);
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.type) params.append("type", filters.type);
+    // The API only applies the range when both ends are present.
+    if (filters?.startDate && filters?.endDate) {
+      params.append("start_date", filters.startDate);
+      params.append("end_date", filters.endDate);
+    }
+    if (filters?.page && filters.page > 1) params.append("page", filters.page.toString());
+    return params;
+  }
+
   // Actions
   async function fetchIncidents(filters?: IncidentFilters): Promise<void> {
-    const employeeId = authStore.user?.employeeRecords?.[0]?.id;
+    const employeeId = authStore.currentEmployee?.id;
     if (!employeeId) return;
 
+    const id = ++requestId;
     loading.value = true;
+    error.value = false;
     try {
-      const params = new URLSearchParams();
-      params.append("employee_id", employeeId);
-      if (filters?.status) params.append("status", filters.status);
-      if (filters?.type) params.append("type", filters.type);
-      if (filters?.startDate) params.append("start_date", filters.startDate);
-      if (filters?.endDate) params.append("end_date", filters.endDate);
+      // The endpoint paginates (20 per page): the rows are in `data.data`.
+      const response = await api.get(`/incidents?${buildParams(employeeId, filters).toString()}`);
+      if (id !== requestId) return;
 
-      const response = await api.get(`/incidents?${params.toString()}`);
-      incidents.value = extractArrayData<Incident>(response);
-    } catch (error: any) {
-      console.error("Error fetching incidents:", error);
-      toast.error("Failed to fetch incidents");
+      incidents.value = unwrapList<Incident>(response);
+      pageMeta.value = unwrapPageMeta(response);
+
+      const unfilteredByType = !filters?.type && !(filters?.startDate && filters?.endDate);
+      if (filters?.status === "pending" && unfilteredByType) {
+        // This very request already counted them.
+        pendingTotal.value = pageMeta.value?.total ?? incidents.value.length;
+      } else {
+        await fetchPendingTotal(employeeId, id);
+      }
+    } catch (err) {
+      if (id !== requestId) return;
+      console.error("Error fetching incidents:", err);
       incidents.value = [];
+      pageMeta.value = null;
+      error.value = true;
     } finally {
-      loading.value = false;
+      if (id === requestId) loading.value = false;
+    }
+  }
+
+  async function fetchPendingTotal(employeeId: string, id: number): Promise<void> {
+    try {
+      const response = await api.get(
+        `/incidents?${buildParams(employeeId, { status: "pending" }).toString()}`
+      );
+      if (id !== requestId) return;
+      pendingTotal.value = unwrapPageMeta(response)?.total ?? unwrapList(response).length;
+    } catch (err) {
+      // The list itself loaded; a missing count is not worth failing the screen for.
+      console.warn("Could not count pending incidents:", err);
     }
   }
 
   function reset(): void {
+    requestId++;
     incidents.value = [];
+    pageMeta.value = null;
+    pendingTotal.value = 0;
+    loading.value = false;
+    error.value = false;
   }
 
   return {
     // State
     incidents,
+    pageMeta,
     loading,
+    error,
 
     // Computed
     pendingIncidents,
@@ -128,6 +171,9 @@ export const useIncidentsStore = defineStore("incidents", () => {
     markedAbsenceIncidents,
     pendingCount,
     hasPendingIncidents,
+    currentPage,
+    totalPages,
+    totalIncidents,
     incidentsByType,
     incidentsByStatus,
 

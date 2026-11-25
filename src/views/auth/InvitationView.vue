@@ -39,12 +39,9 @@ async function loadInvitation() {
   try {
     loading.value = true
     error.value = ''
-    console.log('Loading invitation with token:', token)
     const response = await api.get(`/invitations/${token}`)
-    console.log('API response:', response.data)
     invitation.value = response.data.data.invitation
   } catch (err: any) {
-    console.error('Error loading invitation:', err)
     if (err.response?.status === 410) {
       error.value = err.response.data.message || t('invitation.expiredOrUsed')
     } else if (err.response?.status === 404) {
@@ -109,7 +106,6 @@ async function handleSubmit() {
 }
 
 onMounted(() => {
-  console.log("InvitationView - onMounted, token:", token)
   loadInvitation()
 })
 </script>
@@ -146,16 +142,17 @@ onMounted(() => {
       </p>
 
       <!-- General error -->
-      <div v-if="error" class="mb-4 p-3 bg-error/10 border border-error rounded-lg text-error text-sm">
+      <div v-if="error" class="mb-4 p-3 bg-error/10 border border-error rounded-lg text-red-700 text-sm" role="alert">
         {{ error }}
       </div>
 
       <form @submit.prevent="handleSubmit">
         <!-- Read-only fields from invitation -->
-        <div class="grid grid-cols-2 gap-4 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
-            <label class="label">{{ $t('invitation.firstName') }}</label>
+            <label for="invitation-first-name" class="label">{{ $t('invitation.firstName') }}</label>
             <input
+              id="invitation-first-name"
               type="text"
               :value="invitation.firstName"
               class="input bg-neutral-100"
@@ -163,8 +160,9 @@ onMounted(() => {
             />
           </div>
           <div>
-            <label class="label">{{ $t('invitation.lastName') }}</label>
+            <label for="invitation-last-name" class="label">{{ $t('invitation.lastName') }}</label>
             <input
+              id="invitation-last-name"
               type="text"
               :value="invitation.lastName"
               class="input bg-neutral-100"
@@ -174,8 +172,9 @@ onMounted(() => {
         </div>
 
         <div class="mb-4">
-          <label class="label">{{ $t('auth.email') }}</label>
+          <label for="invitation-email" class="label">{{ $t('auth.email') }}</label>
           <input
+            id="invitation-email"
             type="email"
             :value="invitation.email"
             class="input bg-neutral-100"
@@ -193,7 +192,7 @@ onMounted(() => {
             class="input"
             :class="{ 'border-error focus:border-error focus:ring-error': errors.password }"
             autocomplete="new-password"
-            placeholder="********"
+            aria-required="true"
           />
           <p v-if="errors.password" class="error-text">{{ errors.password }}</p>
         </div>
@@ -207,7 +206,7 @@ onMounted(() => {
             class="input"
             :class="{ 'border-error focus:border-error focus:ring-error': errors.passwordConfirmation }"
             autocomplete="new-password"
-            placeholder="********"
+            aria-required="true"
           />
           <p v-if="errors.passwordConfirmation" class="error-text">{{ errors.passwordConfirmation }}</p>
         </div>
@@ -216,7 +215,7 @@ onMounted(() => {
         <div class="border-t pt-4 mb-4">
           <p class="text-sm text-neutral-500 mb-4">{{ $t('invitation.optionalFields') }}</p>
 
-          <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label for="identification-number" class="label">{{ $t('profile.idNumber') }}</label>
               <input
@@ -241,7 +240,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label for="phone" class="label">{{ $t('profile.phone') }}</label>
               <input

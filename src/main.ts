@@ -1,5 +1,3 @@
-console.log("main.ts - starting application...")
-
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import Toast from 'vue-toastification'

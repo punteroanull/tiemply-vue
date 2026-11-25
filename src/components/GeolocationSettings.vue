@@ -4,12 +4,20 @@ import { useI18n } from "vue-i18n";
 import { useWorkStatusStore } from "../stores/workStatus";
 import {
   isGeolocationAvailable,
-  checkGeolocationPermission,
+  getGeolocationPermissionState,
+  type GeolocationPermissionState,
 } from "../utils/geolocation";
+import { formatLocalized } from "../utils/apiDates";
 
 const { t } = useI18n();
 const workStatusStore = useWorkStatusStore();
-const hasGeolocationPermission = ref(false);
+const permissionState = ref<GeolocationPermissionState>("unknown");
+const requestingPermission = ref(false);
+// Why the last permission request failed, kept on screen: a console message tells the
+// user nothing.
+const permissionError = ref<string | null>(null);
+const hasGeolocationPermission = computed(() => permissionState.value === "granted");
+const isPermissionBlocked = computed(() => permissionState.value === "denied");
 
 const geolocationStatus = computed(() => {
   if (!isGeolocationAvailable()) {
@@ -34,7 +42,9 @@ const geolocationStatus = computed(() => {
     return {
       available: true,
       status: "permission-needed",
-      message: t("geolocation.permissionNeeded"),
+      message: isPermissionBlocked.value
+        ? t("geolocation.permissionBlocked")
+        : t("geolocation.permissionNeeded"),
       icon: "permission",
     };
   }
@@ -90,6 +100,9 @@ const statusIcon = computed(() => {
 });
 
 async function requestLocationPermission() {
+  requestingPermission.value = true;
+  permissionError.value = null;
+
   try {
     await new Promise<GeolocationPosition>(
       (resolve, reject) => {
@@ -101,15 +114,34 @@ async function requestLocationPermission() {
       }
     );
 
-    hasGeolocationPermission.value = true;
+    permissionState.value = "granted";
   } catch (error) {
-    console.error("Failed to get location permission:", error);
+    const code = (error as GeolocationPositionError | undefined)?.code;
+
+    if (code === 1) {
+      // Blocked: asking again does nothing until the user changes it in the browser.
+      permissionState.value = "denied";
+      permissionError.value = t("geolocation.permissionBlocked");
+    } else {
+      // The browser answered, so the permission itself is fine; the position was not.
+      permissionError.value = t(
+        code === 3 ? "geolocation.errors.timeout" : "geolocation.errors.positionUnavailable"
+      );
+    }
+  } finally {
+    requestingPermission.value = false;
   }
 }
 
 async function checkPermissions() {
-  hasGeolocationPermission.value = await checkGeolocationPermission();
+  permissionState.value = await getGeolocationPermissionState();
 }
+
+const lastLocationTime = computed(() =>
+  workStatusStore.locationData
+    ? formatLocalized(new Date(workStatusStore.locationData.timestamp), "Pp")
+    : ""
+);
 
 onMounted(async () => {
   await checkPermissions();
@@ -133,10 +165,10 @@ onMounted(async () => {
         statusClasses,
       ]"
     >
-      <div v-html="statusIcon" class="flex-shrink-0 mt-0.5"></div>
+      <div v-html="statusIcon" class="flex-shrink-0 mt-0.5" aria-hidden="true"></div>
 
       <div class="flex-1">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="font-medium">
               {{
@@ -153,13 +185,23 @@ onMounted(async () => {
           </div>
 
           <button
-            v-if="geolocationStatus.status === 'permission-needed'"
+            v-if="geolocationStatus.status === 'permission-needed' && !isPermissionBlocked"
+            type="button"
             @click="requestLocationPermission"
-            class="btn-primary text-sm px-3 py-1"
+            :disabled="requestingPermission"
+            class="btn-primary text-sm px-3 py-2 flex-shrink-0"
           >
-            {{ t('geolocation.grantPermission') }}
+            {{ requestingPermission ? t('geolocation.gettingLocation') : t('geolocation.grantPermission') }}
           </button>
         </div>
+
+        <p
+          v-if="permissionError && geolocationStatus.status === 'permission-needed' && !isPermissionBlocked"
+          class="mt-2 text-sm font-medium"
+          role="alert"
+        >
+          {{ permissionError }}
+        </p>
 
         <!-- Additional info for enabled status -->
         <div
@@ -232,7 +274,7 @@ onMounted(async () => {
           v-if="geolocationStatus.status === 'permission-needed'"
           class="mt-3"
         >
-          <details class="text-sm">
+          <details class="text-sm" :open="isPermissionBlocked">
             <summary class="cursor-pointer font-medium hover:text-neutral-900">
               {{ t('geolocation.troubleshooting') }}
             </summary>
@@ -263,15 +305,9 @@ onMounted(async () => {
           <span class="font-medium">{{ t('geolocation.coordinates') }}:</span>
           {{ workStatusStore.formattedLocation }}
         </p>
-        <p v-if="workStatusStore.locationData.address">
-          <span class="font-medium">{{ t('geolocation.address') }}:</span>
-          {{ workStatusStore.locationData.address }}
-        </p>
         <p>
           <span class="font-medium">{{ t('geolocation.obtained') }}:</span>
-          {{
-            new Date(workStatusStore.locationData.timestamp).toLocaleString()
-          }}
+          {{ lastLocationTime }}
         </p>
       </div>
     </div>

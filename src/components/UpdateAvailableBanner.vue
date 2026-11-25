@@ -13,11 +13,12 @@ async function update() {
 </script>
 
 <template>
-  <!-- Bottom, not top: the impersonation banner owns the top edge, and this must never
-       cover the clock-in button at bottom-right. -->
+  <!-- Bottom, not top: the impersonation banner owns the top edge. right-24 on small
+       screens keeps it clear of the clock-in button at bottom-right, which a bare
+       max-w-sm (wider than a phone) used to stretch underneath. -->
   <div
     v-if="needRefresh"
-    class="fixed bottom-4 left-4 z-[70] max-w-sm rounded-lg bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
+    class="fixed bottom-4 left-4 right-24 z-[70] rounded-lg sm:right-auto sm:max-w-sm bg-neutral-900 px-4 py-3 text-sm text-white shadow-lg"
     role="status"
   >
     <p class="font-medium">{{ t('pwa.updateAvailable.title') }}</p>

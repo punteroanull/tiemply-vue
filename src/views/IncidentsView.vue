@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useIncidentsStore } from "../stores/incidents";
 import IncidentCard from "../components/IncidentCard.vue";
+import ErrorState from "../components/ErrorState.vue";
 import type { IncidentType, IncidentStatus } from "../types";
 
 const { t } = useI18n();
@@ -10,49 +11,53 @@ const incidentsStore = useIncidentsStore();
 
 const selectedType = ref<IncidentType | "">("");
 const selectedStatus = ref<IncidentStatus | "">("");
+const page = ref(1);
 
-const filteredIncidents = computed(() => {
-  let incidents = incidentsStore.incidents;
+const hasFilters = computed(() => selectedType.value !== "" || selectedStatus.value !== "");
 
-  if (selectedType.value) {
-    incidents = incidents.filter((i) => i.type === selectedType.value);
-  }
-
-  if (selectedStatus.value) {
-    incidents = incidents.filter((i) => i.status === selectedStatus.value);
-  }
-
-  return incidents;
-});
-
-const incidentTypes: { value: IncidentType; label: string }[] = [
-  { value: "unclosed_shift", label: "incidents.types.unclosed_shift" },
-  { value: "late_arrival", label: "incidents.types.late_arrival" },
-  { value: "early_departure", label: "incidents.types.early_departure" },
-  { value: "missing_checkout", label: "incidents.types.missing_checkout" },
+const incidentTypes: IncidentType[] = [
+  "unclosed_shift",
+  "late_arrival",
+  "early_departure",
+  "missing_checkout",
+  "manual_adjustment",
 ];
 
-const incidentStatuses: { value: IncidentStatus; label: string }[] = [
-  { value: "pending", label: "incidents.statuses.pending" },
-  { value: "resolved", label: "incidents.statuses.resolved" },
-  { value: "validated", label: "incidents.statuses.validated" },
-  { value: "marked_absence", label: "incidents.statuses.marked_absence" },
+const incidentStatuses: IncidentStatus[] = [
+  "pending",
+  "resolved",
+  "validated",
+  "marked_absence",
 ];
 
+// Filtering and paging happen on the server (20 per page).
 async function loadData() {
   await incidentsStore.fetchIncidents({
     type: selectedType.value || undefined,
     status: selectedStatus.value || undefined,
+    page: page.value,
   });
 }
 
 async function applyFilters() {
+  page.value = 1;
   await loadData();
 }
 
-onMounted(async () => {
+async function clearFilters() {
+  selectedType.value = "";
+  selectedStatus.value = "";
+  await applyFilters();
+}
+
+async function changePage(next: number) {
+  if (next < 1 || next > incidentsStore.totalPages) return;
+  page.value = next;
   await loadData();
-});
+  window.scrollTo({ top: 0 });
+}
+
+onMounted(loadData);
 </script>
 
 <template>
@@ -62,9 +67,10 @@ onMounted(async () => {
       <h1 class="text-2xl font-semibold text-neutral-800">
         {{ t("incidents.title") }}
       </h1>
+      <!-- Counts every pending incident, whatever filter or page is on screen. -->
       <p
         v-if="incidentsStore.pendingCount > 0"
-        class="text-amber-600 mt-1"
+        class="text-amber-700 mt-1"
       >
         {{ t("incidents.pendingCount", { count: incidentsStore.pendingCount }) }}
       </p>
@@ -74,41 +80,35 @@ onMounted(async () => {
     <div class="bg-white rounded-lg border border-neutral-200 p-4 mb-6">
       <div class="flex flex-col sm:flex-row sm:items-center gap-4">
         <div class="flex-1">
-          <label class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="incident-type-filter" class="block text-sm font-medium text-neutral-700 mb-1">
             {{ t("incidents.filterByType") }}
           </label>
           <select
+            id="incident-type-filter"
             v-model="selectedType"
             @change="applyFilters"
             class="w-full rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
           >
             <option value="">{{ t("incidents.allTypes") }}</option>
-            <option
-              v-for="type in incidentTypes"
-              :key="type.value"
-              :value="type.value"
-            >
-              {{ t(type.label) }}
+            <option v-for="type in incidentTypes" :key="type" :value="type">
+              {{ t(`incidents.types.${type}`) }}
             </option>
           </select>
         </div>
 
         <div class="flex-1">
-          <label class="block text-sm font-medium text-neutral-700 mb-1">
+          <label for="incident-status-filter" class="block text-sm font-medium text-neutral-700 mb-1">
             {{ t("incidents.filterByStatus") }}
           </label>
           <select
+            id="incident-status-filter"
             v-model="selectedStatus"
             @change="applyFilters"
             class="w-full rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
           >
             <option value="">{{ t("incidents.allStatuses") }}</option>
-            <option
-              v-for="status in incidentStatuses"
-              :key="status.value"
-              :value="status.value"
-            >
-              {{ t(status.label) }}
+            <option v-for="status in incidentStatuses" :key="status" :value="status">
+              {{ t(`incidents.statuses.${status}`) }}
             </option>
           </select>
         </div>
@@ -119,19 +119,53 @@ onMounted(async () => {
     <div
       v-if="incidentsStore.loading"
       class="flex items-center justify-center py-12"
+      role="status"
     >
       <div
         class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+        aria-hidden="true"
       ></div>
+      <span class="sr-only">{{ t("common.loading") }}</span>
     </div>
 
+    <!-- Failed to load: not the same as having no incidents -->
+    <ErrorState v-else-if="incidentsStore.error" @retry="loadData" />
+
     <!-- Incidents list -->
-    <div v-else-if="filteredIncidents.length > 0" class="space-y-4">
-      <IncidentCard
-        v-for="incident in filteredIncidents"
-        :key="incident.id"
-        :incident="incident"
-      />
+    <div v-else-if="incidentsStore.incidents.length > 0">
+      <div class="space-y-4">
+        <IncidentCard
+          v-for="incident in incidentsStore.incidents"
+          :key="incident.id"
+          :incident="incident"
+        />
+      </div>
+
+      <nav
+        v-if="incidentsStore.totalPages > 1"
+        class="mt-6 flex items-center justify-between gap-3"
+        :aria-label="t('incidents.pagination')"
+      >
+        <button
+          type="button"
+          class="btn-outline min-h-[44px]"
+          :disabled="incidentsStore.currentPage <= 1"
+          @click="changePage(incidentsStore.currentPage - 1)"
+        >
+          {{ t("common.previous") }}
+        </button>
+        <p class="text-sm text-neutral-500">
+          {{ t("incidents.pageOf", { page: incidentsStore.currentPage, total: incidentsStore.totalPages }) }}
+        </p>
+        <button
+          type="button"
+          class="btn-outline min-h-[44px]"
+          :disabled="incidentsStore.currentPage >= incidentsStore.totalPages"
+          @click="changePage(incidentsStore.currentPage + 1)"
+        >
+          {{ t("common.next") }}
+        </button>
+      </nav>
     </div>
 
     <!-- Empty state -->
@@ -146,6 +180,7 @@ onMounted(async () => {
         stroke-width="1.5"
         stroke="currentColor"
         class="w-12 h-12 mx-auto text-neutral-400"
+        aria-hidden="true"
       >
         <path
           stroke-linecap="round"
@@ -153,12 +188,25 @@ onMounted(async () => {
           d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
         />
       </svg>
-      <h3 class="mt-4 text-lg font-medium text-neutral-900">
-        {{ t("incidents.noIncidents") }}
-      </h3>
-      <p class="mt-2 text-neutral-500">
-        {{ t("incidents.noIncidentsDescription") }}
-      </p>
+      <template v-if="hasFilters">
+        <h3 class="mt-4 text-lg font-medium text-neutral-900">
+          {{ t("incidents.noResults") }}
+        </h3>
+        <p class="mt-2 text-neutral-500">
+          {{ t("incidents.noResultsDescription") }}
+        </p>
+        <button type="button" class="btn-outline mx-auto mt-4" @click="clearFilters">
+          {{ t("incidents.allTypes") }} · {{ t("incidents.allStatuses") }}
+        </button>
+      </template>
+      <template v-else>
+        <h3 class="mt-4 text-lg font-medium text-neutral-900">
+          {{ t("incidents.noIncidents") }}
+        </h3>
+        <p class="mt-2 text-neutral-500">
+          {{ t("incidents.noIncidentsDescription") }}
+        </p>
+      </template>
     </div>
   </div>
 </template>

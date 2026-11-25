@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useDepartmentsStore } from "../stores/departments";
-import { format, parseISO, subDays } from "date-fns";
-import { enUS, es } from "date-fns/locale";
+import { format, subDays } from "date-fns";
+import { apiDateToYmd, formatApiDate, formatClockTime } from "../utils/apiDates";
 import SourceBadge from "../components/SourceBadge.vue";
+import ErrorState from "../components/ErrorState.vue";
 
-const { t, locale } = useI18n();
+const { t, te } = useI18n();
 const router = useRouter();
 const departmentsStore = useDepartmentsStore();
 
@@ -15,13 +16,12 @@ const loading = computed(() => departmentsStore.loading);
 const workLogs = computed(() => departmentsStore.workLogs);
 const employees = computed(() => departmentsStore.employees);
 const canManage = computed(() => departmentsStore.canManageDepartment);
+const hasError = computed(() => departmentsStore.workLogsError);
 
 // Filters
 const selectedEmployee = ref("all");
 const startDate = ref(format(subDays(new Date(), 7), "yyyy-MM-dd"));
 const endDate = ref(format(new Date(), "yyyy-MM-dd"));
-
-const dateLocale = computed(() => (locale.value === "es" ? es : enUS));
 
 // Filtered work logs
 const filteredWorkLogs = computed(() => {
@@ -33,39 +33,35 @@ const filteredWorkLogs = computed(() => {
   );
 });
 
-// Group work logs by date
+// Group work logs by calendar day, newest day first and in time order within the day
 const groupedWorkLogs = computed(() => {
   const groups: Record<string, typeof workLogs.value> = {};
   filteredWorkLogs.value.forEach((log) => {
-    if (!groups[log.date]) {
-      groups[log.date] = [];
+    // The API sends the day as a UTC instant; the helper recovers the day it meant.
+    const day = apiDateToYmd(log.date) ?? String(log.date);
+    if (!groups[day]) {
+      groups[day] = [];
     }
-    groups[log.date].push(log);
+    groups[day].push(log);
   });
-  // Sort by date descending
-  return Object.entries(groups).sort(
-    ([a], [b]) => new Date(b).getTime() - new Date(a).getTime()
-  );
+
+  return Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(
+      ([day, logs]) =>
+        [day, [...logs].sort((a, b) => String(a.time).localeCompare(String(b.time)))] as [
+          string,
+          typeof workLogs.value
+        ]
+    );
 });
 
 function formatDate(dateStr: string) {
-  try {
-    return format(parseISO(dateStr), "EEEE, MMM d, yyyy", {
-      locale: dateLocale.value,
-    });
-  } catch {
-    return dateStr;
-  }
+  return formatApiDate(dateStr, "PPPP") || dateStr;
 }
 
 function formatTime(timeStr: string) {
-  try {
-    // Time comes as HH:mm:ss
-    const [hours, minutes] = timeStr.split(":");
-    return `${hours}:${minutes}`;
-  } catch {
-    return timeStr;
-  }
+  return formatClockTime(timeStr) || timeStr;
 }
 
 function getTypeClass(type: string) {
@@ -79,26 +75,13 @@ function getTypeText(type: string) {
 }
 
 function getCategoryText(category: string) {
-  switch (category) {
-    case "shift_start":
-      return locale.value === "es" ? "Inicio turno" : "Shift start";
-    case "shift_end":
-      return locale.value === "es" ? "Fin turno" : "Shift end";
-    case "break_start":
-      return locale.value === "es" ? "Inicio descanso" : "Break start";
-    case "break_end":
-      return locale.value === "es" ? "Fin descanso" : "Break end";
-    case "offsite_start":
-      return locale.value === "es" ? "Salida oficina" : "Offsite start";
-    case "offsite_end":
-      return locale.value === "es" ? "Regreso oficina" : "Offsite end";
-    default:
-      return category;
-  }
+  return te(`workLogs.categories.${category}`)
+    ? t(`workLogs.categories.${category}`)
+    : category;
 }
 
 function getEmployeeName(log: any): string {
-  return log.employee?.user?.name || log.employee?.name || "Unknown";
+  return log.employee?.user?.name || log.employee?.name || t("common.unknown");
 }
 
 function goBack() {
@@ -106,6 +89,9 @@ function goBack() {
 }
 
 async function applyFilters() {
+  // An inverted range would just come back empty.
+  if (!startDate.value || !endDate.value || startDate.value > endDate.value) return;
+
   await departmentsStore.fetchDepartmentWorkLogs(
     undefined,
     startDate.value,
@@ -113,18 +99,16 @@ async function applyFilters() {
   );
 }
 
+// Every filter applies as soon as it changes, like the employee one always did.
+watch([startDate, endDate], applyFilters);
+
 onMounted(async () => {
   if (!canManage.value) {
     router.push("/department");
     return;
   }
 
-  await departmentsStore.fetchDepartmentWorkLogs(
-    undefined,
-    startDate.value,
-    endDate.value
-  );
-  await departmentsStore.fetchEmployees();
+  await Promise.all([applyFilters(), departmentsStore.fetchEmployees()]);
 });
 </script>
 
@@ -133,10 +117,11 @@ onMounted(async () => {
     <!-- Header -->
     <div class="mb-6">
       <button
+        type="button"
         @click="goBack"
-        class="flex items-center text-neutral-600 hover:text-neutral-800 mb-2"
+        class="flex items-center text-neutral-600 hover:text-neutral-800 mb-2 py-1"
       >
-        <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+        <svg class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
           <path
             fill-rule="evenodd"
             d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
@@ -155,12 +140,13 @@ onMounted(async () => {
 
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow p-4 mb-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dwl-employee" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("department.employee")
           }}</label>
           <select
+            id="dwl-employee"
             v-model="selectedEmployee"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
@@ -171,42 +157,42 @@ onMounted(async () => {
           </select>
         </div>
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dwl-from" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("absences.from")
           }}</label>
           <input
+            id="dwl-from"
             type="date"
+            :max="endDate"
             v-model="startDate"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <div>
-          <label class="block text-sm font-medium text-neutral-700 mb-1">{{
+          <label for="dwl-to" class="block text-sm font-medium text-neutral-700 mb-1">{{
             $t("absences.to")
           }}</label>
           <input
+            id="dwl-to"
             type="date"
+            :min="startDate"
             v-model="endDate"
             class="w-full px-3 py-2 border border-neutral-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
-        </div>
-        <div class="flex items-end">
-          <button
-            @click="applyFilters"
-            class="w-full px-4 py-2 bg-neutral-100 text-neutral-700 font-medium rounded-md hover:bg-neutral-200 transition-colors"
-          >
-            {{ locale === "es" ? "Aplicar" : "Apply" }}
-          </button>
         </div>
       </div>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="flex justify-center items-center h-64">
+    <div v-if="loading" class="flex justify-center items-center h-64" role="status">
       <div
         class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"
       ></div>
+      <span class="sr-only">{{ $t("common.loading") }}</span>
     </div>
+
+    <!-- Error state -->
+    <ErrorState v-else-if="hasError" @retry="applyFilters" />
 
     <!-- Empty state -->
     <div
@@ -216,7 +202,7 @@ onMounted(async () => {
       <div
         class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-neutral-100 text-neutral-500 mb-4"
       >
-        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path
             stroke-linecap="round"
             stroke-linejoin="round"
@@ -246,7 +232,7 @@ onMounted(async () => {
             {{ formatDate(date) }}
           </h3>
           <p class="text-sm text-neutral-500">
-            {{ logs.length }} {{ locale === "es" ? "registros" : "entries" }}
+            {{ $t("workLogs.entries", { count: logs.length }, logs.length) }}
           </p>
         </div>
 
@@ -255,16 +241,17 @@ onMounted(async () => {
           <div
             v-for="log in logs"
             :key="log.id"
-            class="px-4 py-3 flex items-center justify-between"
+            class="px-4 py-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2"
           >
-            <div class="flex items-center">
+            <div class="flex items-center min-w-0">
               <div
-                class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm mr-3"
+                aria-hidden="true"
+                class="h-8 w-8 flex-shrink-0 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm mr-3"
               >
                 {{ getEmployeeName(log).charAt(0).toUpperCase() }}
               </div>
-              <div>
-                <p class="font-medium text-neutral-800">
+              <div class="min-w-0">
+                <p class="font-medium text-neutral-800 truncate">
                   {{ getEmployeeName(log) }}
                 </p>
                 <p class="text-sm text-neutral-500">
@@ -272,7 +259,7 @@ onMounted(async () => {
                 </p>
               </div>
             </div>
-            <div class="text-right flex items-center gap-2">
+            <div class="flex items-center gap-2 ml-auto">
               <SourceBadge :source="log.source" size="sm" />
               <span
                 class="px-2 py-1 text-xs font-medium rounded-full"
@@ -280,7 +267,7 @@ onMounted(async () => {
               >
                 {{ getTypeText(log.type) }}
               </span>
-              <p class="text-sm text-neutral-600">
+              <p class="text-sm font-medium text-neutral-700 tabular-nums">
                 {{ formatTime(log.time) }}
               </p>
             </div>

@@ -1,7 +1,12 @@
 import axios from "axios";
 import { convertKeysToCamelCase } from "../utils/caseConverter";
 import { useToast } from "vue-toastification";
-import { isReadOnlyRejection, resolveImpersonated401 } from "./impersonationErrors";
+import i18n from "../i18n";
+import {
+  isReadOnlyRejection,
+  resolveImpersonated401,
+  SESSION_EXPIRED_KEY,
+} from "./impersonationErrors";
 
 // Works outside components, which is where this interceptor runs.
 const toast = useToast();
@@ -9,6 +14,8 @@ const toast = useToast();
 // Create axios instance with base URL
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
+  // Without a limit a stalled mobile connection leaves every spinner running forever.
+  timeout: 20000,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -24,8 +31,8 @@ api.interceptors.request.use(
     }
 
     // Add Accept-Language header for i18n
-    const locale = localStorage.getItem("locale") || "en";
-    config.headers["Accept-Language"] = locale;
+    // The language on screen, so API messages match it even before one was ever saved.
+    config.headers["Accept-Language"] = i18n.global.locale.value;
 
     return config;
   },
@@ -57,9 +64,14 @@ api.interceptors.response.use(
       }
 
       // Unauthorized - clear token and redirect to login
+      const hadSession = !!localStorage.getItem("token");
       localStorage.removeItem("token");
       // Only redirect if not already on login page
       if (window.location.pathname !== "/login") {
+        // The reload wipes any toast, so the login page is told why the user landed there.
+        if (hadSession) {
+          sessionStorage.setItem(SESSION_EXPIRED_KEY, "1");
+        }
         window.location.href = "/login";
       }
     }

@@ -11,6 +11,9 @@ export const TOKEN_KEY = "token";
 export const ORIGINAL_TOKEN_KEY = "token_original";
 export const IMPERSONATING_KEY = "impersonating";
 
+/** sessionStorage flag: the login page was reached because the session expired. */
+export const SESSION_EXPIRED_KEY = "session_expired";
+
 export function isImpersonating(): boolean {
   return localStorage.getItem(IMPERSONATING_KEY) === "1";
 }

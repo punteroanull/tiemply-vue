@@ -73,24 +73,26 @@ const sourceConfig = computed(() => {
       sourceConfig.textClass
     ]"
     :title="sourceConfig.label"
+    :role="showLabel ? undefined : 'img'"
+    :aria-label="showLabel ? undefined : sourceConfig.label"
   >
     <!-- Web icon (monitor/computer) -->
-    <svg v-if="sourceConfig.icon === 'computer'" :class="iconSize" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg v-if="sourceConfig.icon === 'computer'" :class="iconSize" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
     </svg>
 
     <!-- Mobile icon (smartphone) -->
-    <svg v-else-if="sourceConfig.icon === 'smartphone'" :class="iconSize" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg v-else-if="sourceConfig.icon === 'smartphone'" :class="iconSize" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
     </svg>
 
     <!-- NFC icon (contactless/wifi) -->
-    <svg v-else-if="sourceConfig.icon === 'contactless'" :class="iconSize" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg v-else-if="sourceConfig.icon === 'contactless'" :class="iconSize" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
     </svg>
 
     <!-- Manual icon (pencil) -->
-    <svg v-else-if="sourceConfig.icon === 'pencil'" :class="iconSize" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg v-else-if="sourceConfig.icon === 'pencil'" :class="iconSize" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
     </svg>
 

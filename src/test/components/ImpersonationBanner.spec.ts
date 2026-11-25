@@ -41,7 +41,7 @@ describe('ImpersonationBanner', () => {
   it('renders nothing when there is no impersonation', () => {
     wrapper = mountWith(null);
 
-    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+    expect(wrapper.find('[role="status"]').exists()).toBe(false);
   });
 
   it('names the impersonated person and marks the session read-only', () => {
@@ -66,5 +66,26 @@ describe('ImpersonationBanner', () => {
     await wrapper.find('button').trigger('click');
 
     expect(store.stopImpersonation).toHaveBeenCalled();
+  });
+
+  it('is a status region, not an alert', () => {
+    wrapper = mountWith(CONTEXT);
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(true);
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
+
+  it('hands the session back once the time runs out', () => {
+    wrapper = mountWith({ ...CONTEXT, expiresAt: new Date(Date.now() - 1000).toISOString() });
+    const store = useAuthStore();
+
+    expect(store.stopImpersonation).toHaveBeenCalledWith({ silent: true });
+  });
+
+  it('leaves a running session alone', () => {
+    wrapper = mountWith(CONTEXT);
+    const store = useAuthStore();
+
+    expect(store.stopImpersonation).not.toHaveBeenCalled();
   });
 });

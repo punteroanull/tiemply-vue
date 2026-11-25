@@ -1,5 +1,5 @@
 export default {
-  // Navegacion
+  // Navegación
   nav: {
     dashboard: 'Panel',
     workLogs: 'Registro de Horas',
@@ -11,6 +11,14 @@ export default {
     profile: 'Perfil',
     signOut: 'Cerrar sesión',
     yourProfile: 'Tu Perfil',
+    openMenu: 'Abrir menú',
+    closeMenu: 'Cerrar menú',
+    openUserMenu: 'Abrir menú de usuario',
+    mainNavigation: 'Navegación principal',
+    management: 'Gestión',
+    roleAdmin: 'Administrador',
+    roleManager: 'Gerente',
+    roleSupervisor: 'Supervisor',
     language: 'Idioma',
     employee: 'Empleado',
     hourPool: 'Pool de Horas'
@@ -34,24 +42,39 @@ export default {
     goToLogin: 'Ir a iniciar sesión'
   },
 
-  // Autenticacion
+  // Autenticación
   auth: {
     signIn: 'Inicia sesión en tu cuenta',
-    createAccount: 'Crea una cuenta',
     email: 'Correo electrónico',
     password: 'Contraseña',
     confirmPassword: 'Confirmar contraseña',
-    fullName: 'Nombre completo',
-    rememberMe: 'Recordarme',
-    forgotPassword: 'Olvidaste tu contraseña?',
+    forgotPassword: '¿Olvidaste tu contraseña?',
     signInButton: 'Iniciar sesión',
     signingIn: 'Iniciando sesión...',
-    createAccountButton: 'Crear cuenta',
-    creatingAccount: 'Creando cuenta...',
-    noAccount: 'No tienes cuenta?',
-    hasAccount: 'Ya tienes cuenta?',
-    register: 'Registrarse',
+    tagline: 'Gestión del tiempo de trabajo',
+    emailPlaceholder: 'tu.correo@ejemplo.com',
+    sessionExpired: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
+    sessionLoadFailedTitle: 'No se ha podido cargar tu sesión',
+    sessionLoadFailedBody: 'Puede que no tengas conexión o que el servidor no responda. Tu sesión sigue abierta.',
     login: 'Iniciar sesión',
+    reset: {
+      title: 'Restablecer contraseña',
+      intro: 'Escribe el correo de tu cuenta y te enviaremos un enlace para elegir una contraseña nueva.',
+      send: 'Enviar enlace',
+      sending: 'Enviando...',
+      sent: 'Si {email} tiene una cuenta, le hemos enviado un enlace para restablecer la contraseña.',
+      sentHint: 'Puede tardar unos minutos. Revisa también la carpeta de spam.',
+      requestFailed: 'No se pudo solicitar el enlace. Inténtalo de nuevo.',
+      backToLogin: 'Volver a iniciar sesión',
+      newPasswordTitle: 'Elige una contraseña nueva',
+      newPasswordIntro: 'Contraseña nueva para {email}.',
+      newPassword: 'Contraseña nueva',
+      save: 'Guardar contraseña',
+      failed: 'No se pudo cambiar la contraseña. Inténtalo de nuevo.',
+      linkInvalid: 'Este enlace está incompleto o ya no es válido.',
+      requestNewLink: 'Pedir un enlace nuevo',
+      done: 'Contraseña cambiada. Inicia sesión con la nueva.'
+    },
     validation: {
       emailRequired: 'El correo es requerido',
       passwordRequired: 'La contraseña es requerida',
@@ -80,9 +103,12 @@ export default {
     startedAt: 'Inicio a las',
     breakTime: 'Tiempo de descanso',
     offsite: 'Fuera de oficina',
-    leftAt: 'Salio a las',
+    leftAt: 'Salió a las',
     timeOffsite: 'Tiempo fuera',
     lastCheckedOut: 'Última salida',
+    expectedHours: 'Horas previstas',
+    weeklyProgress: 'Progreso semanal',
+    weeklyLoadError: 'No se ha podido cargar el resumen semanal.',
     notCheckedIn: 'No has registrado entrada hoy.',
     pending: 'Pendiente'
   },
@@ -103,7 +129,39 @@ export default {
     startYourShift: 'Iniciar tu turno',
     endYourShift: 'Finalizar tu turno',
     goOffsiteAction: 'Salir de oficina',
-    returnToOfficeAction: 'Volver a la oficina'
+    returnToOfficeAction: 'Volver a la oficina',
+    actionsMenu: 'Fichar entrada y salida',
+    elapsed: 'Tiempo transcurrido',
+    shiftStartedAt: 'Turno iniciado a las {time}',
+    pendingSync: 'Sin fichajes pendientes | 1 fichaje pendiente de sincronizar | {count} fichajes pendientes de sincronizar',
+    confirmEndShiftTitle: '¿Finalizar el turno?',
+    confirmEndShiftBody: 'El turno se cerrará con la hora actual. No se puede deshacer desde la aplicación.',
+    confirmEndShiftAction: 'Finalizar turno',
+    notes: {
+      shift_start: 'Turno iniciado desde la app de Tiemply',
+      shift_end: 'Turno finalizado desde la app de Tiemply',
+      break_start: 'Descanso iniciado desde la app de Tiemply',
+      break_end: 'Vuelta del descanso desde la app de Tiemply',
+      offsite_start: 'Salida de la oficina desde la app de Tiemply',
+      offsite_end: 'Vuelta a la oficina desde la app de Tiemply'
+    },
+    toasts: {
+      shift_start: 'Turno iniciado',
+      shift_end: 'Turno finalizado',
+      break_start: 'Descanso iniciado',
+      break_end: 'De vuelta del descanso',
+      offsite_start: 'Salida de la oficina registrada',
+      offsite_end: 'De vuelta en la oficina',
+      statusError: 'No se ha podido cargar tu estado de trabajo actual',
+      actionFailed: 'No se ha podido registrar el fichaje. Inténtalo de nuevo.',
+      serverError: 'Error {status}: {message}',
+      noEmployee: 'No se ha encontrado un registro de empleado para tu usuario.',
+      savedOffline: 'Guardado sin conexión. Se registrará con la hora en la que se sincronice, no con la actual.',
+      syncDone: 'Nada que sincronizar | Se ha sincronizado 1 fichaje guardado sin conexión | Se han sincronizado {count} fichajes guardados sin conexión',
+      syncRejected: 'Se ha rechazado un fichaje guardado sin conexión: {reason}',
+      syncRejectedGeneric: 'el servidor no lo ha aceptado',
+      syncWaitingLocation: 'Hay fichajes sin conexión pendientes: hace falta tu ubicación para registrarlos.'
+    }
   },
 
   // Registro de horas
@@ -118,7 +176,7 @@ export default {
     totalDays: 'Total días',
     totalHours: 'Total horas',
     noWorkLogs: 'No se encontraron registros',
-    noWorkLogsForPeriod: 'No hay registros de horas para este período.',
+    noWorkLogsForPeriod: 'No hay registros de horas para este periodo.',
     noLogsForDay: 'No hay registros para este día',
     checkIn: 'Entrada',
     checkOut: 'Salida',
@@ -132,11 +190,32 @@ export default {
     exporting: 'Exportando...',
     exportSuccess: 'PDF exportado correctamente',
     exportError: 'Error al exportar PDF',
+    exportNotAvailable: 'La exportación a PDF no está incluida en el plan de tu empresa.',
+    fetchError: 'No se ha podido cargar el informe de horas',
+    noEmployee: 'No se ha encontrado un registro de empleado para tu usuario.',
+    daysWorked: 'Días trabajados',
+    entries: 'Sin registros | 1 registro | {count} registros',
+    previousPeriod: 'Periodo anterior',
+    nextPeriod: 'Periodo siguiente',
+    goToDate: 'Ir a una fecha',
+    inProgress: 'En curso',
+    types: {
+      check_in: 'Entrada',
+      check_out: 'Salida'
+    },
+    categories: {
+      shift_start: 'Inicio de turno',
+      shift_end: 'Fin de turno',
+      break_start: 'Inicio de descanso',
+      break_end: 'Fin de descanso',
+      offsite_start: 'Salida de la oficina',
+      offsite_end: 'Vuelta a la oficina'
+    },
     duration: 'Duración',
     source: 'Origen',
     sourceTypes: {
       web: 'Web',
-      mobile: 'Movil',
+      mobile: 'Móvil',
       nfc: 'NFC',
       manual: 'Manual'
     }
@@ -144,6 +223,16 @@ export default {
 
   // Ausencias
   absences: {
+    errors: {
+      fetchTypes: 'No se han podido cargar los tipos de ausencia',
+      fetchAbsences: 'No se han podido cargar tus ausencias'
+    },
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
+    legendVacation: 'Vacaciones',
+    legendSick: 'Enfermedad',
+    legendPersonal: 'Asuntos propios',
+    legendOther: 'Otras',
     title: 'Ausencias',
     viewAndFilter: 'Ver y filtrar tus ausencias',
     list: 'Lista',
@@ -157,8 +246,8 @@ export default {
     noMatchFilter: 'No hay ausencias que coincidan con el filtro.',
     duration: 'Duración',
     status: 'Estado',
-    fullDay: 'Dia completo',
-    partialDay: 'Dia parcial',
+    fullDay: 'Día completo',
+    partialDay: 'Día parcial',
     absence: 'Ausencia',
     vacationAvailable: 'Vacaciones disponibles',
     daysAvailable: '{remaining}/{total} días disponibles',
@@ -171,6 +260,23 @@ export default {
 
   // Solicitudes
   requests: {
+    status: {
+      pending: 'Pendiente',
+      approved: 'Aprobada',
+      rejected: 'Rechazada',
+      partial: 'Parcial'
+    },
+    noResultsByStatus: {
+      pending: 'No hay solicitudes pendientes.',
+      approved: 'No hay solicitudes aprobadas.',
+      rejected: 'No hay solicitudes rechazadas.',
+      partial: 'No hay solicitudes aprobadas parcialmente.'
+    },
+    errors: {
+      fetch: 'No se han podido cargar las solicitudes',
+      fetchOne: 'No se ha podido cargar la solicitud'
+    },
+    typeLocked: 'El tipo de ausencia no se puede cambiar. Para pedir otro tipo, cancela esta solicitud y crea una nueva.',
     title: 'Solicitudes de Ausencia',
     newRequest: 'Nueva Solicitud',
     all: 'Todas',
@@ -179,7 +285,7 @@ export default {
     rejected: 'Rechazadas',
     partialStatus: 'Parciales',
     noRequests: 'No se encontraron solicitudes',
-    noRequestsYet: 'Aúnno has enviado ningúna solicitud de ausencia.',
+    noRequestsYet: 'Aún no has enviado ninguna solicitud de ausencia.',
     noFilterResults: 'No se encontraron solicitudes {status}.',
     createFirst: 'Crea tu primera solicitud',
     type: 'Tipo',
@@ -191,7 +297,7 @@ export default {
     cancelConfirmTitle: 'Cancelar Solicitud',
     cancelConfirmMessage: '¿Estás seguro de que quieres cancelar esta solicitud de ausencia? Esta acción no se puede deshacer.',
     keepRequest: 'Mantener Solicitud',
-    yesCancelIt: 'Si, Cancelar',
+    yesCancelIt: 'Sí, cancelar',
     cancelling: 'Cancelando...',
     cancelSuccess: 'Solicitud cancelada correctamente',
     cancelError: 'Error al cancelar la solicitud',
@@ -207,20 +313,46 @@ export default {
     cannotEditPeriods: 'Las solicitudes por periodos se gestionan desde el detalle de la solicitud, no desde este formulario.',
     requestNotFound: 'Solicitud no encontrada',
     edit: 'Editar',
-    addPeriod: 'Agregar período',
-    removePeriod: 'Eliminar período',
+    addPeriod: 'Agregar periodo',
+    removePeriod: 'Eliminar periodo',
     period: 'Periodo',
     periods: 'Periodos',
     periodOf: 'Periodo {current} de {total}',
     approvedDays: 'Días aprobados',
     pendingDays: 'Días pendientes',
     exceedsAvailable: 'Excede los días disponibles',
-    exceedsAllowed: 'Excede el maximo permitido',
-    willUseExcess: 'Usara {days} días extra'
+    exceedsAllowed: 'Excede el máximo permitido',
+    willUseExcess: 'Usará {days} días extra'
   },
 
   // Solicitudes del equipo (Managers)
   teamRequests: {
+    errors: {
+      fetch: 'No se han podido cargar las solicitudes del equipo',
+      review: 'No se ha podido registrar la revisión'
+    },
+    empty: {
+      pending: {
+        title: 'Nada pendiente de revisar',
+        description: 'Cuando alguien de tu equipo envíe una solicitud aparecerá aquí.'
+      },
+      reviewed: {
+        title: 'Aún no hay solicitudes revisadas',
+        description: 'Las solicitudes aprobadas o rechazadas aparecerán aquí.'
+      },
+      all: {
+        title: 'No hay solicitudes del equipo',
+        description: 'Tu equipo todavía no ha enviado ninguna solicitud.'
+      }
+    },
+    ownRequest: 'Es tu propia solicitud: debe revisarla otra persona.',
+    rejectionReasonRequired: 'Indica el motivo del rechazo.',
+    approveRequestSuccess: 'Solicitud aprobada correctamente',
+    rejectRequestSuccess: 'Solicitud rechazada correctamente',
+    confirmApproveTitle: 'Confirmar aprobación',
+    confirmApprovePeriod: '¿Aprobar el periodo {dates}?',
+    confirmApproveRequest: '¿Aprobar la solicitud de {name}?',
+    confirmApproveHint: 'Al aprobar se registran las ausencias y se descuentan los días. No se puede deshacer desde aquí.',
     title: 'Solicitudes del Equipo',
     pendingReview: 'Pendientes de Revisión',
     reviewed: 'Revisadas',
@@ -233,19 +365,31 @@ export default {
     rejectionReasonPlaceholder: 'Ingrese el motivo del rechazo...',
     approveSuccess: 'Periodo aprobado correctamente',
     rejectSuccess: 'Periodo rechazado correctamente',
-    approveAllSuccess: 'Todos los períodos aprobados',
-    rejectAllSuccess: 'Todos los períodos rechazados',
+    approveAllSuccess: 'Todos los periodos aprobados',
+    rejectAllSuccess: 'Todos los periodos rechazados',
     noTeamRequests: 'No hay solicitudes pendientes de tu equipo',
     reviewedAt: 'Revisado el',
-    approvePeriod: 'Aprobar período',
-    rejectPeriod: 'Rechazar período',
+    approvePeriod: 'Aprobar periodo',
+    rejectPeriod: 'Rechazar periodo',
     confirmReject: 'Confirmar Rechazo',
-    periodStatus: 'Estado del período',
+    periodStatus: 'Estado del periodo',
     accessDenied: 'No tienes permisos para revisar las solicitudes del equipo'
   },
 
   // Nueva solicitud
   newRequest: {
+    serverErrorsTitle: 'No se pudo guardar la solicitud:',
+    validation: {
+      selectType: 'Selecciona un tipo de ausencia.',
+      datesRequired: 'Indica la fecha de inicio y de fin.',
+      endBeforeStart: 'La fecha de fin no puede ser anterior a la de inicio.',
+      timesRequired: 'Indica la hora de inicio y de fin de la ausencia parcial.',
+      endTimeBeforeStart: 'La hora de fin debe ser posterior a la de inicio.',
+      periodsOverlap: 'Este periodo coincide con otro de la misma solicitud.',
+      noWorkingDays: 'Las fechas elegidas no incluyen ningún día laborable.',
+      startTooEarly: 'La fecha de inicio no puede ser anterior al {date}.'
+    },
+    businessDaysHint: 'Solo cuentan los días laborables (de lunes a viernes).',
     title: 'Nueva Solicitud de Ausencia',
     backToRequests: 'Volver a solicitudes',
     absenceType: 'Tipo de Ausencia',
@@ -262,7 +406,7 @@ export default {
     notes: 'Notas (opcional)',
     notesPlaceholder: 'Añade cualquier información adicional sobre tu solicitud...',
     characters: 'caracteres',
-    requiresApproval: 'Este tipo de ausencia requiere aprobacion del supervisor. Tu solicitud quedara pendiente hasta ser revisada.',
+    requiresApproval: 'Este tipo de ausencia requiere aprobación del supervisor. Tu solicitud quedará pendiente hasta ser revisada.',
     submit: 'Enviar Solicitud',
     submitting: 'Enviando...',
     submitSuccess: 'Solicitud de ausencia enviada correctamente',
@@ -278,7 +422,7 @@ export default {
     employmentInfo: 'Información Laboral',
     fullName: 'Nombre Completo',
     email: 'Correo Electrónico',
-    idNumber: 'Número de Identificacion',
+    idNumber: 'Número de Identificación',
     phone: 'Teléfono',
     birthDate: 'Fecha de Nacimiento',
     role: 'Rol',
@@ -289,28 +433,39 @@ export default {
     status: 'Estado',
     active: 'Activo',
     inactive: 'Inactivo',
-    notProvided: 'No proporcionado'
+    notProvided: 'No proporcionado',
+    address: 'Dirección',
+    saving: 'Guardando...',
+    companyManagedHint: 'Tu correo, tu documento y tu rol los gestiona tu empresa.',
+    changePassword: 'Cambiar contraseña',
+    changePasswordHint: 'Al cambiarla se cierra la sesión en tus otros dispositivos.',
+    currentPassword: 'Contraseña actual',
+    newPassword: 'Contraseña nueva',
+    passwordMustDiffer: 'La contraseña nueva debe ser distinta de la actual'
   },
 
   // Mensajes de notificacion
   messages: {
-    loginSuccess: 'Sesion iniciada correctamente',
+    loginSuccess: 'Sesión iniciada correctamente',
     loginFailed: 'Error al iniciar sesión',
-    registerSuccess: 'Registro exitoso',
-    registerFailed: 'Error en el registro',
-    logoutSuccess: 'Sesion cerrada correctamente',
+    logoutSuccess: 'Sesión cerrada correctamente',
     profileUpdated: 'Perfil actualizado correctamente',
     profileUpdateFailed: 'Error al actualizar el perfil',
     passwordChanged: 'Contraseña cambiada correctamente',
     passwordChangeFailed: 'Error al cambiar la contraseña',
     fetchError: 'Error al obtener los datos',
-    savedOffline: 'Guardado para sincronizar cuando se restaure la conexion',
-    invalidResponse: 'Respuesta invalida del servidor',
+    savedOffline: 'Guardado para sincronizar cuando se restaure la conexión',
+    invalidResponse: 'Respuesta inválida del servidor',
+    pageNotFound: 'Página no encontrada',
+    pageNotFoundBody: 'La página que buscas no existe o se ha movido.',
+    backToHome: 'Volver al inicio',
+    backToOwnAccount: 'Has vuelto a tu cuenta',
+    impersonationLinkInvalid: 'El enlace de acceso ya no es válido',
     locationReady: 'Ubicación lista',
     locationError: 'Error de ubicación',
     locationPending: 'Ubicación pendiente',
     gettingLocation: 'Obteniendo ubicación...',
-    offlineActionsWillSync: 'Sin conexion - las acciónes se sincronizaran despues',
+    offlineActionsWillSync: 'Sin conexión: las acciones se sincronizarán después',
     locationRequiredForCheckout: 'Se requiere ubicación para hacer check-out pero no se pudo obtener.',
     checkoutNotRecorded: 'El check-out puede no haberse registrado. Por favor verifica en tu historial de horas.'
   },
@@ -323,14 +478,21 @@ export default {
     delete: 'Eliminar',
     edit: 'Editar',
     close: 'Cerrar',
-    yes: 'Si',
+    yes: 'Sí',
     no: 'No',
     confirm: 'Confirmar',
     back: 'Volver',
     next: 'Siguiente',
     required: 'requerido',
     optional: 'opcional',
-    allRightsReserved: 'Todos los derechos reservados'
+    allRightsReserved: 'Todos los derechos reservados',
+    loadError: 'No se han podido cargar los datos',
+    loadErrorHint: 'Comprueba tu conexión e inténtalo de nuevo.',
+    retry: 'Reintentar',
+    unknown: 'Desconocido',
+    apply: 'Aplicar',
+    previous: 'Anterior',
+    today: 'Hoy'
   },
 
   // Selector de idioma
@@ -343,6 +505,19 @@ export default {
 
   // Departamento
   department: {
+    errors: {
+      fetchDepartment: 'No se ha podido cargar el departamento',
+      fetchEmployees: 'No se han podido cargar los empleados',
+      fetchCalendar: 'No se ha podido cargar el calendario',
+      fetchAbsences: 'No se han podido cargar las ausencias',
+      fetchRequests: 'No se han podido cargar las solicitudes',
+      fetchWorkLogs: 'No se han podido cargar los registros de horas'
+    },
+    validation: {
+      selectEmployee: 'Selecciona un empleado.',
+      dateRequired: 'Indica la fecha de la ausencia.'
+    },
+    reviewRequests: 'Revisar solicitudes',
     section: 'Departamento',
     title: 'Mi Departamento',
     myDepartment: 'Mi Departamento',
@@ -424,7 +599,8 @@ export default {
       split: 'Jornada Partida',
       night: 'Turno Nocturno',
       guard: 'Guardia',
-      rotating: 'Rotativo'
+      rotating: 'Rotativo',
+      flexible: 'Horario flexible'
     },
     block: 'Bloque',
     startTime: 'Inicio',
@@ -435,7 +611,21 @@ export default {
     nextDay: '(día siguiente)',
     noBlocksToday: 'No hay bloques de horario hoy',
     effectiveFrom: 'Vigente desde',
-    effectiveUntil: 'Vigente hasta'
+    effectiveUntil: 'Vigente hasta',
+    restDay: 'Sin turno',
+    contractSchedule: 'Horario de contrato',
+    contractScheduleDescription: 'No tienes un horario por bloques asignado; se aplica el horario de tu contrato.',
+    contractHours: 'Horario',
+    dailyHours: 'Horas diarias',
+    flexibleDescription: 'No tienes un horario fijo: debes completar un mínimo de horas en cada periodo.',
+    requiredHoursWeek: '{hours} por semana',
+    requiredHoursMonth: '{hours} al mes',
+    flexiblePeriod: 'Periodo del {start} al {end}',
+    flexibleWorked: 'Trabajado en el periodo',
+    flexibleRemaining: 'Pendiente',
+    notAvailableOnPlan: 'Horarios no disponibles',
+    notAvailableOnPlanDescription: 'Los horarios no están incluidos en el plan de tu empresa.',
+    weekNavigation: 'Navegación por semanas'
   },
 
   // Horas Extra
@@ -456,7 +646,7 @@ export default {
     manualRegistration: 'Registro manual',
     monthlyBreakdown: 'Desglose Mensual',
     noRecords: 'No hay registros de horas extra',
-    noRecordsDescription: 'Aúnno tienes horas extra registradas.',
+    noRecordsDescription: 'Aún no tienes horas extra registradas.',
     registeredMessage: 'Se han registrado {hours} horas extra',
     date: 'Fecha',
     hours: 'Horas',
@@ -467,7 +657,14 @@ export default {
     filterByMonth: 'Filtrar por mes',
     allStatuses: 'Todos los estados',
     allMonths: 'Todos los meses',
-    year: 'Año'
+    year: 'Año',
+    noResults: 'Sin resultados',
+    noResultsDescription: 'Ningún registro coincide con los filtros seleccionados.',
+    noLimit: 'Sin límite anual configurado',
+    limitProgress: 'Horas extra aprobadas respecto al límite anual',
+    totalHoursHint: 'Aprobadas + pendientes',
+    notAvailableOnPlan: 'Horas extra no disponibles',
+    notAvailableOnPlanDescription: 'Las horas extra no están incluidas en el plan de tu empresa.'
   },
 
   // Incidencias
@@ -477,7 +674,8 @@ export default {
       unclosed_shift: 'Turno sin cerrar',
       late_arrival: 'Llegada tardía',
       early_departure: 'Salida anticipada',
-      missing_checkout: 'Salida no registrada'
+      missing_checkout: 'Salida no registrada',
+      manual_adjustment: 'Ajuste manual'
     },
     statuses: {
       pending: 'Pendiente',
@@ -496,6 +694,10 @@ export default {
     resolvedBy: 'Resuelto por',
     resolvedAt: 'Resuelto el',
     resolutionNotes: 'Notas de resolución',
+    noResults: 'Sin resultados',
+    noResultsDescription: 'Ninguna incidencia coincide con los filtros seleccionados.',
+    pageOf: 'Página {page} de {total}',
+    pagination: 'Paginación de incidencias',
     filterByType: 'Filtrar por tipo',
     filterByStatus: 'Filtrar por estado',
     allTypes: 'Todos los tipos',
@@ -506,11 +708,11 @@ export default {
   // Registro de trabajo (ampliado)
   workLog: {
     nightShift: 'Turno nocturno',
-    shiftDate: 'Dia del turno',
+    shiftDate: 'Día del turno',
     effectiveHours: 'Horas efectivas',
     overtimeRegistered: 'Horas extra registradas',
     nightShiftIndicator: 'Estás en turno nocturno',
-    shiftDateDifferent: 'Dia del turno: {date}'
+    shiftDateDifferent: 'Día del turno: {date}'
   },
 
   // Pool de Horas
@@ -534,6 +736,17 @@ export default {
     source: 'Origen',
     description: 'Descripción',
     createdBy: 'Creado por',
+    amount: 'Cantidad',
+    filterByType: 'Filtrar por tipo',
+    filterBySource: 'Filtrar por origen',
+    allTimeBalanceHint: 'El balance es el acumulado desde el inicio. El año filtra los movimientos y las horas extra pendientes.',
+    yearActivity: 'Movimientos de {year}',
+    yearNet: 'Neto',
+    noResults: 'Sin resultados',
+    noResultsDescription: 'Ningún movimiento coincide con el año y los filtros seleccionados.',
+    notAvailableOnPlan: 'Pool de horas no disponible',
+    notAvailableOnPlanDescription: 'El pool de horas no está incluido en el plan de tu empresa.',
+    pagination: 'Paginación de movimientos',
     actions: 'Acciones',
     notAvailable: 'Pool de Horas no disponible',
     notAvailableDescription: 'El pool de horas no está disponible para empleados en esta empresa.',
@@ -560,7 +773,12 @@ export default {
       employees: 'Empleados',
       employee: 'Empleado',
       employeeBreakdown: 'Desglose por Empleado',
-      noEmployees: 'No hay datos de empleados disponibles'
+      noEmployees: 'No hay datos de empleados disponibles',
+      search: 'Buscar empleado',
+      noMatches: 'Ningún empleado coincide con la búsqueda.',
+      noAccess: 'Resumen no disponible',
+      noAccessDescription: 'Solo los administradores y managers de la empresa pueden ver este resumen.',
+      onlyWithEntries: 'Solo se listan los empleados con movimientos en el pool.'
     },
     adjustment: {
       button: 'Ajustar',
@@ -568,11 +786,21 @@ export default {
       descriptionPlaceholder: 'Motivo del ajuste...',
       minutesRequired: 'Los minutos deben ser al menos 1',
       descriptionRequired: 'La descripción es obligatoria',
-      success: 'Ajuste creado correctamente'
+      success: 'Ajuste creado correctamente',
+      error: 'No se ha podido crear el ajuste',
+      newButton: 'Nuevo ajuste',
+      employee: 'Empleado',
+      selectEmployee: 'Selecciona un empleado',
+      employeeRequired: 'Selecciona un empleado',
+      loadEmployeesError: 'No se ha podido cargar la lista de empleados',
+      equivalent: 'Equivale a {duration}',
+      confirmCredit: 'Se añadirán {duration} al pool de {name}.',
+      confirmDebit: 'Se descontarán {duration} del pool de {name}.',
+      confirmQuestion: '¿Confirmas el ajuste?'
     }
   },
 
-  // Geolocalización
+  // PWA
   pwa: {
     updateAvailable: {
       title: 'Hay una versión nueva',
@@ -597,11 +825,11 @@ export default {
   geolocation: {
     title: 'Servicios de Ubicación',
     description: 'Gestionar seguimiento de ubicación para entrada y salida',
-    notSupported: 'La geolocalizacion no es compatible con tu navegador',
-    disabledForCompany: 'La geolocalizacion esta deshabilitada para tu empresa',
+    notSupported: 'La geolocalización no es compatible con tu navegador',
+    disabledForCompany: 'La geolocalización está deshabilitada para tu empresa',
     permissionNeeded: 'Se necesita permiso de ubicación para entrada/salida',
     locationRequired: 'La ubicación es requerida para entrada/salida',
-    locationOptional: 'Se solicitara ubicación durante entrada/salida',
+    locationOptional: 'Se solicitará ubicación durante entrada/salida',
     permissionFailed: 'Error al obtener permiso de ubicación',
     enabled: 'Ubicación Habilitada',
     permissionRequired: 'Permiso Requerido',
@@ -616,7 +844,6 @@ export default {
     troubleshooting: 'Solución de problemas',
     lastKnownLocation: 'Última Ubicación Conocida',
     coordinates: 'Coordenadas',
-    address: 'Dirección',
     obtained: 'Obtenida',
     troubleshootingIntro: 'Si tienes problemas con los permisos de ubicación:',
     troubleshootingStep1: 'Haz clic en el icono de ubicación en la barra de direcciones',
@@ -628,6 +855,9 @@ export default {
     locationPending: 'Ubicación pendiente',
     retry: 'Reintentar',
     gettingLocation: 'Obteniendo ubicación…',
+    permissionBlocked: 'El acceso a la ubicación está bloqueado para este sitio. Permítelo desde el icono del candado en la barra de direcciones e inténtalo de nuevo.',
+    statusGranted: 'Permiso de ubicación concedido',
+    statusUnknown: 'Aún no se ha solicitado el permiso de ubicación',
     errors: {
       notSupported: 'Tu navegador no permite obtener la ubicación. Abre la aplicación en Chrome o Safari actualizados y comprueba que la dirección empieza por https.',
       permissionDenied: 'has bloqueado el acceso a la ubicación. Pulsa el icono del candado en la barra de direcciones y permite la ubicación para este sitio.',

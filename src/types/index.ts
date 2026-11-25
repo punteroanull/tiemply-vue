@@ -251,7 +251,7 @@ export interface WorkLogReport {
 // SCHEDULE TYPES (Horarios Flexibles)
 // ==========================================
 
-export type ScheduleType = 'normal' | 'split' | 'night' | 'guard' | 'rotating';
+export type ScheduleType = 'normal' | 'split' | 'night' | 'guard' | 'rotating' | 'flexible';
 
 export interface ScheduleBlock {
   id: string;
@@ -269,25 +269,67 @@ export interface EmployeeSchedule {
   isActive: boolean;
   effectiveFrom: string;
   effectiveUntil?: string;
+  requiredHours?: number | string | null;
+  hoursPeriod?: FlexibleHoursPeriod | null;
   blocks: ScheduleBlock[];
 }
 
+export type FlexibleHoursPeriod = 'week' | 'month';
+
+/** Contract start/end times, used when the employee has no schedule record. */
+export interface LegacySchedule {
+  schedule: null;
+  blocks: ScheduleBlock[];
+  totalHours: number;
+  isWorkingDay: boolean;
+  contractStartTime: string;
+  contractEndTime: string;
+}
+
+/** Progress of a flexible (hours-based) schedule within its week or month. */
+export interface FlexibleProgress {
+  period: FlexibleHoursPeriod;
+  periodStart: string;
+  periodEnd: string;
+  requiredHours: number;
+  requiredMinutes: number;
+  workedMinutes: number;
+  remainingMinutes: number;
+}
+
+/**
+ * `GET /employees/{id}/schedules/current`. `type` is "flexible" whenever the employee has
+ * a schedule record (of any `scheduleType`) and "legacy" when only contract times apply.
+ */
+export interface CurrentScheduleResponse {
+  type: 'legacy' | 'flexible';
+  scheduleType: ScheduleType | null;
+  isFlexible: boolean;
+  schedule: EmployeeSchedule | LegacySchedule | null;
+  progress?: FlexibleProgress | null;
+}
+
 export interface WeeklyScheduleDay {
+  /** Calendar day, "yyyy-MM-dd". */
+  date: string;
+  /** 0 = Sunday ... 6 = Saturday. */
+  dayOfWeek: number;
   dayName: string;
+  isWorkingDay: boolean;
+  isFlexible: boolean;
   blocks: ScheduleBlock[];
   totalHours: number;
 }
 
+/** `GET /employees/{id}/schedules/weekly/{weekStart?}`: seven days, Monday first. */
 export interface WeeklyScheduleResponse {
   weekStart: string;
   weekEnd: string;
-  schedule: {
-    id: string;
-    name: string;
-    scheduleType: ScheduleType;
-  };
-  days: Record<string, WeeklyScheduleDay>;
+  days: WeeklyScheduleDay[];
   totalWeeklyHours: number;
+  isFlexible: boolean;
+  flexible?: { requiredHours: number; hoursPeriod: FlexibleHoursPeriod } | null;
+  flexibleProgress?: FlexibleProgress | null;
 }
 
 // ==========================================
@@ -301,27 +343,34 @@ export interface OvertimeRecord {
   date: string;
   hours: number;
   status: OvertimeStatus;
-  approvedBy?: string;
-  approvedAt?: string;
-  notes?: string;
+  /** User id of the reviewer. Never show it: use `approver.name`. */
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  approver?: { id: string; name: string } | null;
+  rejectionReason?: string | null;
+  notes?: string | null;
 }
 
 export interface OvertimeMonthSummary {
-  approved: number;
-  pending: number;
-  rejected: number;
-}
-
-export interface OvertimeSummary {
-  employeeId: string;
-  year: number;
   totalHours: number;
   approvedHours: number;
   pendingHours: number;
   rejectedHours: number;
+  count: number;
+}
+
+/** `GET /overtime/employee/{id}/summary/{year}`. The annual limit counts approved hours. */
+export interface OvertimeSummary {
+  employeeId: string;
+  employeeName?: string;
+  year: number;
+  approvedHours: number;
+  pendingHours: number;
   annualLimit: number;
-  remainingLimit: number;
-  byMonth: Record<string, OvertimeMonthSummary>;
+  remainingHours: number;
+  usagePercentage: number;
+  /** Keyed by "yyyy-MM". */
+  monthlyBreakdown: Record<string, OvertimeMonthSummary>;
   records: OvertimeRecord[];
 }
 
@@ -335,7 +384,7 @@ export interface OvertimeRegistered {
 // INCIDENT TYPES (Incidencias)
 // ==========================================
 
-export type IncidentType = 'unclosed_shift' | 'late_arrival' | 'early_departure' | 'missing_checkout';
+export type IncidentType = 'unclosed_shift' | 'late_arrival' | 'early_departure' | 'missing_checkout' | 'manual_adjustment';
 export type IncidentStatus = 'pending' | 'resolved' | 'validated' | 'marked_absence';
 
 export interface Incident {
@@ -347,7 +396,9 @@ export interface Incident {
   actualTime?: string;
   resolvedTime?: string;
   resolutionType?: string;
-  resolvedBy?: string;
+  /** User id of the resolver. Never show it: use `resolver.name`. */
+  resolvedBy?: string | null;
+  resolver?: { id: string; name: string } | null;
   resolvedAt?: string;
   notes?: string;
 }
@@ -357,6 +408,7 @@ export interface IncidentFilters {
   type?: IncidentType;
   startDate?: string;
   endDate?: string;
+  page?: number;
 }
 
 // ==========================================
@@ -389,7 +441,12 @@ export interface ConfirmedBalance {
 }
 
 export interface EmployeePoolBalance {
+  /** Running total since the start. */
   confirmed: ConfirmedBalance;
+  /** Year the figures below refer to. */
+  year?: number;
+  /** Movements of that year only. */
+  yearActivity?: ConfirmedBalance;
   pendingOvertimeMinutes: number;
   formattedPendingOvertime: string;
   potentialBalance: number;

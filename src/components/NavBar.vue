@@ -10,11 +10,26 @@ defineProps({
     type: String,
     required: true,
   },
+  sidebarOpen: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["toggle-sidebar", "logout"]);
 
 const isProfileMenuOpen = ref(false);
+const profileButton = ref<HTMLButtonElement | null>(null);
+
+function closeProfileMenu() {
+  isProfileMenuOpen.value = false;
+}
+
+function onProfileMenuEscape() {
+  if (!isProfileMenuOpen.value) return;
+  closeProfileMenu();
+  profileButton.value?.focus();
+}
 const currentTime = ref(new Date());
 const intervalId = ref<number | null>(null);
 
@@ -45,6 +60,7 @@ function toggleSidebar() {
 }
 
 function logout() {
+  closeProfileMenu();
   emit("logout");
 }
 
@@ -63,13 +79,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav class="bg-white shadow-subtle fixed top-0 left-0 right-0 z-40">
+  <header class="app-navbar bg-white shadow-subtle fixed top-0 left-0 right-0 z-40">
     <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16">
         <div class="flex items-center">
+          <!-- The sidebar is always visible from md up, so the toggle is mobile-only. -->
           <button
+            type="button"
             @click="toggleSidebar"
-            class="p-2 rounded-md text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 focus:outline-none"
+            class="md:hidden p-2 mr-2 rounded-md text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            :aria-label="sidebarOpen ? t('nav.closeMenu') : t('nav.openMenu')"
+            :aria-expanded="sidebarOpen"
+            aria-controls="app-sidebar"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -77,6 +98,7 @@ onUnmounted(() => {
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -87,8 +109,8 @@ onUnmounted(() => {
             </svg>
           </button>
 
-          <div class="ml-4 flex items-center">
-            <img src="/favicon.svg" alt="Tiemply" class="h-7 w-7 mr-2" />
+          <div class="flex items-center">
+            <img src="/favicon.svg" alt="" class="h-7 w-7 mr-2" />
             <span class="text-xl font-semibold text-primary-600">Tiemply</span>
           </div>
         </div>
@@ -103,12 +125,20 @@ onUnmounted(() => {
             }}</span>
           </div>
 
-          <div class="relative">
+          <div
+            class="relative"
+            v-click-outside="closeProfileMenu"
+            @keydown.esc="onProfileMenuEscape"
+          >
             <button
+              ref="profileButton"
+              type="button"
               @click="toggleProfileMenu"
-              class="flex items-center max-w-xs text-sm rounded-full focus:outline-none border border-neutral-200 bg-white px-3 py-2"
+              class="flex items-center max-w-xs text-sm rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 border border-neutral-200 bg-white px-3 py-2"
+              aria-haspopup="true"
+              :aria-expanded="isProfileMenuOpen"
             >
-              <span class="sr-only">Open user menu</span>
+              <span class="sr-only">{{ t('nav.openUserMenu') }}</span>
               <span class="inline-flex items-center">
                 <span
                   class="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white mr-2"
@@ -121,6 +151,7 @@ onUnmounted(() => {
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                   fill="currentColor"
+                  aria-hidden="true"
                 >
                   <path
                     fill-rule="evenodd"
@@ -147,12 +178,13 @@ onUnmounted(() => {
               <div class="border-t border-neutral-200 my-1"></div>
 
               <!-- Language Selector -->
-              <LanguageSelector />
+              <LanguageSelector @changed="closeProfileMenu" />
 
               <!-- Separator -->
               <div class="border-t border-neutral-200 my-1"></div>
 
               <button
+                type="button"
                 @click="logout"
                 class="block w-full text-left px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100"
               >
@@ -163,5 +195,5 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
-  </nav>
+  </header>
 </template>

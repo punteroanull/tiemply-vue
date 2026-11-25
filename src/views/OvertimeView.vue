@@ -1,32 +1,38 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { format, parseISO } from "date-fns";
-import { enUS, es } from "date-fns/locale";
 import { useOvertimeStore } from "../stores/overtime";
 import OvertimeProgressBar from "../components/OvertimeProgressBar.vue";
+import ErrorState from "../components/ErrorState.vue";
+import {
+  formatApiDate,
+  formatHoursAsDuration,
+  formatLocalized,
+  parseApiDate,
+} from "../utils/apiDates";
 import type { OvertimeStatus } from "../types";
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 const overtimeStore = useOvertimeStore();
 
 const selectedYear = ref(new Date().getFullYear());
 const selectedStatus = ref<OvertimeStatus | "">("");
 const selectedMonth = ref<string>("");
 
-const dateLocale = computed(() => (locale.value === "es" ? es : enUS));
-
+// Past years and this one: there is nothing to show for a year that has not started.
 const years = computed(() => {
   const currentYear = new Date().getFullYear();
-  return [currentYear - 1, currentYear, currentYear + 1];
+  return [currentYear - 2, currentYear - 1, currentYear];
 });
 
 const months = computed(() => {
   return Array.from({ length: 12 }, (_, i) => ({
     value: (i + 1).toString(),
-    label: format(new Date(2024, i, 1), "MMMM", { locale: dateLocale.value }),
+    label: formatLocalized(new Date(2024, i, 1), "LLLL"),
   }));
 });
+
+const hasFilters = computed(() => selectedStatus.value !== "" || selectedMonth.value !== "");
 
 const filteredRecords = computed(() => {
   let records = overtimeStore.summary?.records || [];
@@ -37,8 +43,9 @@ const filteredRecords = computed(() => {
 
   if (selectedMonth.value) {
     records = records.filter((r) => {
-      const recordMonth = parseISO(r.date).getMonth() + 1;
-      return recordMonth.toString() === selectedMonth.value;
+      // parseApiDate recovers the calendar day the server meant, in any browser timezone.
+      const date = parseApiDate(r.date);
+      return date !== null && (date.getMonth() + 1).toString() === selectedMonth.value;
     });
   }
 
@@ -47,9 +54,9 @@ const filteredRecords = computed(() => {
 
 function getStatusBadgeClass(status: OvertimeStatus): string {
   const classes: Record<OvertimeStatus, string> = {
-    pending: "bg-amber-100 text-amber-700",
-    approved: "bg-green-100 text-green-700",
-    rejected: "bg-red-100 text-red-700",
+    pending: "bg-amber-100 text-amber-800",
+    approved: "bg-green-100 text-green-800",
+    rejected: "bg-red-100 text-red-800",
   };
   return classes[status] || "bg-neutral-100 text-neutral-700";
 }
@@ -60,22 +67,18 @@ function getStatusLabel(status: OvertimeStatus): string {
     approved: t("overtime.approved"),
     rejected: t("overtime.rejected"),
   };
-  return labels[status] || status;
+  return labels[status] || t("common.unknown");
 }
 
 function formatDate(dateStr: string): string {
-  try {
-    return format(parseISO(dateStr), "PPP", { locale: dateLocale.value });
-  } catch {
-    return dateStr;
-  }
+  return formatApiDate(dateStr, "PPP") || dateStr;
 }
 
-function formatHours(hours: number): string {
-  const h = Math.floor(hours);
-  const m = Math.round((hours - h) * 60);
-  if (m > 0) return `${h}h ${m}m`;
-  return `${h}h`;
+const formatHours = formatHoursAsDuration;
+
+function clearFilters() {
+  selectedStatus.value = "";
+  selectedMonth.value = "";
 }
 
 async function loadData() {
@@ -87,9 +90,7 @@ async function changeYear(year: number) {
   await loadData();
 }
 
-onMounted(async () => {
-  await loadData();
-});
+onMounted(loadData);
 </script>
 
 <template>
@@ -104,9 +105,13 @@ onMounted(async () => {
       </div>
 
       <!-- Year selector -->
-      <div class="flex items-center gap-2 mt-4 md:mt-0">
-        <label class="text-sm text-neutral-600">{{ t("overtime.year") }}:</label>
+      <div
+        v-if="!overtimeStore.featureUnavailable"
+        class="flex items-center gap-2 mt-4 md:mt-0"
+      >
+        <label for="overtime-year" class="text-sm text-neutral-600">{{ t("overtime.year") }}:</label>
         <select
+          id="overtime-year"
           :value="selectedYear"
           @change="changeYear(Number(($event.target as HTMLSelectElement).value))"
           class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
@@ -118,40 +123,68 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Loading state -->
+    <!-- Not included in the company plan -->
     <div
-      v-if="overtimeStore.loading"
+      v-if="overtimeStore.featureUnavailable"
+      class="bg-white rounded-lg border border-neutral-200 p-8 text-center"
+    >
+      <h3 class="text-lg font-medium text-neutral-900">
+        {{ t("overtime.notAvailableOnPlan") }}
+      </h3>
+      <p class="mt-2 text-neutral-500">
+        {{ t("overtime.notAvailableOnPlanDescription") }}
+      </p>
+    </div>
+
+    <!-- First load: afterwards the page stays in place while a year is fetched -->
+    <div
+      v-else-if="overtimeStore.loading && !overtimeStore.summary"
       class="flex items-center justify-center py-12"
+      role="status"
     >
       <div
         class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"
+        aria-hidden="true"
       ></div>
+      <span class="sr-only">{{ t("common.loading") }}</span>
     </div>
 
-    <div v-else>
+    <!-- Failed to load: never shown as zeros -->
+    <ErrorState
+      v-else-if="overtimeStore.error || !overtimeStore.summary"
+      :retrying="overtimeStore.loading"
+      @retry="loadData"
+    />
+
+    <div
+      v-else
+      :class="{ 'opacity-60 pointer-events-none': overtimeStore.loading }"
+      :aria-busy="overtimeStore.loading"
+    >
       <!-- Summary cards -->
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <!-- Total hours -->
         <div class="bg-white rounded-lg border border-neutral-200 p-4">
           <p class="text-sm text-neutral-500">{{ t("overtime.totalHours") }}</p>
           <p class="text-2xl font-semibold text-neutral-900 mt-1">
-            {{ formatHours(overtimeStore.summary?.totalHours || 0) }}
+            {{ formatHours(overtimeStore.totalHours) }}
           </p>
+          <p class="text-xs text-neutral-500 mt-1">{{ t("overtime.totalHoursHint") }}</p>
         </div>
 
         <!-- Approved -->
         <div class="bg-white rounded-lg border border-neutral-200 p-4">
           <p class="text-sm text-neutral-500">{{ t("overtime.approved") }}</p>
-          <p class="text-2xl font-semibold text-green-600 mt-1">
-            {{ formatHours(overtimeStore.summary?.approvedHours || 0) }}
+          <p class="text-2xl font-semibold text-green-700 mt-1">
+            {{ formatHours(overtimeStore.summary.approvedHours) }}
           </p>
         </div>
 
         <!-- Pending -->
         <div class="bg-white rounded-lg border border-neutral-200 p-4">
           <p class="text-sm text-neutral-500">{{ t("overtime.pending") }}</p>
-          <p class="text-2xl font-semibold text-amber-600 mt-1">
-            {{ formatHours(overtimeStore.summary?.pendingHours || 0) }}
+          <p class="text-2xl font-semibold text-amber-700 mt-1">
+            {{ formatHours(overtimeStore.summary.pendingHours) }}
           </p>
         </div>
 
@@ -159,24 +192,31 @@ onMounted(async () => {
         <div class="bg-white rounded-lg border border-neutral-200 p-4">
           <p class="text-sm text-neutral-500">{{ t("overtime.remaining") }}</p>
           <p class="text-2xl font-semibold text-primary-600 mt-1">
-            {{ formatHours(overtimeStore.summary?.remainingLimit || 0) }}
+            {{
+              overtimeStore.summary.annualLimit > 0
+                ? formatHours(overtimeStore.summary.remainingHours)
+                : "—"
+            }}
           </p>
         </div>
       </div>
 
-      <!-- Progress bar -->
+      <!-- Progress bar: approved hours against the annual limit, as the API counts it -->
       <div class="bg-white rounded-lg border border-neutral-200 p-4 mb-6">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm font-medium text-neutral-700">
             {{ t("overtime.annualLimit") }}
           </span>
-          <span class="text-sm text-neutral-500">
-            {{ overtimeStore.summary?.annualLimit || 0 }}h
+          <span
+            v-if="overtimeStore.summary.annualLimit > 0"
+            class="text-sm text-neutral-500"
+          >
+            {{ formatHours(overtimeStore.summary.annualLimit) }}
           </span>
         </div>
         <OvertimeProgressBar
-          :totalHours="overtimeStore.summary?.totalHours || 0"
-          :annualLimit="overtimeStore.summary?.annualLimit || 80"
+          :usedHours="overtimeStore.summary.approvedHours"
+          :annualLimit="overtimeStore.summary.annualLimit"
           :showLabel="true"
         />
       </div>
@@ -193,6 +233,7 @@ onMounted(async () => {
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
               <select
                 v-model="selectedStatus"
+                :aria-label="t('overtime.filterByStatus')"
                 class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
               >
                 <option value="">{{ t("overtime.allStatuses") }}</option>
@@ -203,7 +244,8 @@ onMounted(async () => {
 
               <select
                 v-model="selectedMonth"
-                class="rounded-md border-neutral-300 text-sm focus:border-primary-500 focus:ring-primary-500"
+                :aria-label="t('overtime.filterByMonth')"
+                class="rounded-md border-neutral-300 text-sm capitalize focus:border-primary-500 focus:ring-primary-500"
               >
                 <option value="">{{ t("overtime.allMonths") }}</option>
                 <option
@@ -225,21 +267,25 @@ onMounted(async () => {
               <thead class="bg-neutral-50">
                 <tr>
                   <th
+                    scope="col"
                     class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                   >
                     {{ t("overtime.date") }}
                   </th>
                   <th
+                    scope="col"
                     class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                   >
                     {{ t("overtime.hours") }}
                   </th>
                   <th
+                    scope="col"
                     class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                   >
                     {{ t("overtime.status") }}
                   </th>
                   <th
+                    scope="col"
                     class="px-4 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider"
                   >
                     {{ t("overtime.approvedBy") }}
@@ -266,8 +312,9 @@ onMounted(async () => {
                       {{ getStatusLabel(record.status) }}
                     </span>
                   </td>
+                  <!-- Only ever a name: `approvedBy` is a user id. -->
                   <td class="px-4 py-3 text-sm text-neutral-500">
-                    {{ record.approvedBy || "-" }}
+                    {{ (record.status === "approved" && record.approver?.name) || "-" }}
                   </td>
                 </tr>
               </tbody>
@@ -296,9 +343,12 @@ onMounted(async () => {
                 <span class="text-neutral-500">{{ t("overtime.hours") }}:</span>
                 <span class="font-medium text-neutral-900">{{ formatHours(record.hours) }}</span>
               </div>
-              <div v-if="record.approvedBy" class="flex justify-between items-center text-sm mt-1">
+              <div
+                v-if="record.status === 'approved' && record.approver?.name"
+                class="flex justify-between items-center text-sm mt-1"
+              >
                 <span class="text-neutral-500">{{ t("overtime.approvedBy") }}:</span>
-                <span class="text-neutral-600">{{ record.approvedBy }}</span>
+                <span class="text-neutral-600">{{ record.approver.name }}</span>
               </div>
             </div>
           </div>
@@ -313,6 +363,7 @@ onMounted(async () => {
             stroke-width="1.5"
             stroke="currentColor"
             class="w-12 h-12 mx-auto text-neutral-400"
+            aria-hidden="true"
           >
             <path
               stroke-linecap="round"
@@ -320,12 +371,26 @@ onMounted(async () => {
               d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <h3 class="mt-4 text-lg font-medium text-neutral-900">
-            {{ t("overtime.noRecords") }}
-          </h3>
-          <p class="mt-2 text-neutral-500">
-            {{ t("overtime.noRecordsDescription") }}
-          </p>
+          <!-- Filters that exclude everything are not "no overtime yet". -->
+          <template v-if="hasFilters && (overtimeStore.summary.records.length > 0)">
+            <h3 class="mt-4 text-lg font-medium text-neutral-900">
+              {{ t("overtime.noResults") }}
+            </h3>
+            <p class="mt-2 text-neutral-500">
+              {{ t("overtime.noResultsDescription") }}
+            </p>
+            <button type="button" class="btn-outline mx-auto mt-4" @click="clearFilters">
+              {{ t("overtime.allStatuses") }} · {{ t("overtime.allMonths") }}
+            </button>
+          </template>
+          <template v-else>
+            <h3 class="mt-4 text-lg font-medium text-neutral-900">
+              {{ t("overtime.noRecords") }}
+            </h3>
+            <p class="mt-2 text-neutral-500">
+              {{ t("overtime.noRecordsDescription") }}
+            </p>
+          </template>
         </div>
       </div>
     </div>

@@ -2,31 +2,33 @@
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAbsencesStore } from '../stores/absences';
+import type { Absence } from '../stores/absences';
 import { useAuthStore } from '../stores/auth';
-import { format, parseISO, subMonths } from 'date-fns';
-import { enUS, es } from 'date-fns/locale';
+import { addMonths, format, subMonths } from 'date-fns';
 import AbsenceCalendar from '../components/AbsenceCalendar.vue';
+import ErrorState from '../components/ErrorState.vue';
+import { apiDateToYmd, formatApiDate, formatClockTime } from '../utils/apiDates';
 
-const { t, locale } = useI18n();
+const { t } = useI18n();
 
 const absencesStore = useAbsencesStore();
 const authStore = useAuthStore();
 const loading = computed(() => absencesStore.loading);
-const viewMode = ref('list'); // or 'calendar'
+const viewMode = ref<'list' | 'calendar'>('list');
 
-// Vacation days info
+// Vacation days info. /me arrives camelCased, so the company's yearly allowance is
+// `maxVacationDays`; reading the snake_case name always fell back to 22.
 const remainingVacationDays = computed(() => authStore.remainingVacationDays);
-const maxVacationDays = computed(() => authStore.currentCompany?.max_vacation_days ?? 22);
+const maxVacationDays = computed(
+  () => authStore.currentCompany?.maxVacationDays ?? null
+);
 
-// Absences by type (excluding vacation, only approved)
+// Absences by type (excluding vacation)
 const absenceCountsByType = computed(() => {
   const counts: Record<string, { name: string; count: number; code: string }> = {};
 
   absencesStore.absences
-    .filter(absence =>
-      absence.absenceType?.code !== 'vacation' &&
-      (!absence.request || absence.request.status === 'approved')
-    )
+    .filter(absence => absence.absenceType?.code !== 'vacation')
     .forEach(absence => {
       const typeId = absence.absenceType?.id;
       if (typeId && absence.absenceType) {
@@ -56,36 +58,36 @@ function getTypeColorClasses(code: string) {
   }
 }
 
-// Date locale
-const dateLocale = computed(() => locale.value === "es" ? es : enUS);
-
-// Filter states
+// Filter states. The window looks ahead as well as back: approved vacation is almost
+// always in the future, and a range ending today hid exactly that.
 const selectedType = ref('all');
 const startDate = ref(format(subMonths(new Date(), 6), 'yyyy-MM-dd'));
-const endDate = ref(format(new Date(), 'yyyy-MM-dd'));
+const endDate = ref(format(addMonths(new Date(), 12), 'yyyy-MM-dd'));
 
-// Filtered absences
+// Filtered absences, soonest first within the window
 const filteredAbsences = computed(() => {
-  if (!absencesStore.absences.length) return [];
-  
-  return absencesStore.absences.filter(absence => {
-    const matchesType = selectedType.value === 'all' || 
-      absence.absenceType?.id === selectedType.value;
-    
-    const absenceDate = parseISO(absence.date);
-    const isAfterStart = parseISO(startDate.value) <= absenceDate;
-    const isBeforeEnd = parseISO(endDate.value) >= absenceDate;
-    
-    return matchesType && isAfterStart && isBeforeEnd;
-  });
+  return absencesStore.absences
+    .filter(absence => {
+      const matchesType = selectedType.value === 'all' ||
+        absence.absenceType?.id === selectedType.value;
+
+      // Compare calendar days as "yyyy-MM-dd": the API date is an instant, not a day.
+      const day = apiDateToYmd(absence.date);
+      if (!day) return false;
+      const isAfterStart = !startDate.value || startDate.value <= day;
+      const isBeforeEnd = !endDate.value || endDate.value >= day;
+
+      return matchesType && isAfterStart && isBeforeEnd;
+    })
+    .sort((a, b) => (apiDateToYmd(b.date) ?? '').localeCompare(apiDateToYmd(a.date) ?? ''));
 });
 
-// Format absence duration
-function formatAbsenceDuration(absence: any) {
-  if (!absence.is_partial) return t('absences.fullDay');
+// Format absence duration. Times arrive as "HH:mm" strings, not as dates.
+function formatAbsenceDuration(absence: Absence) {
+  if (!absence.isPartial) return t('absences.fullDay');
 
-  if (absence.start_time && absence.end_time) {
-    return `${format(parseISO(absence.start_time), 'h:mm a')} - ${format(parseISO(absence.end_time), 'h:mm a')}`;
+  if (absence.startTime && absence.endTime) {
+    return `${formatClockTime(absence.startTime)} - ${formatClockTime(absence.endTime)}`;
   }
 
   return t('absences.partialDay');
@@ -105,18 +107,17 @@ function getAbsenceTypeClass(type: string | undefined) {
   }
 }
 
-onMounted(async () => {
-  if (absencesStore.absenceTypes.length === 0) {
-    await absencesStore.fetchAbsenceTypes();
-  }
+async function load() {
+  // Always refetch: absences get approved while the app stays open.
+  await Promise.all([
+    absencesStore.absenceTypes.length === 0 ? absencesStore.fetchAbsenceTypes() : Promise.resolve(),
+    absencesStore.fetchAbsences(),
+    // Pending requests, for the calendar
+    absencesStore.fetchPendingRequests(),
+  ]);
+}
 
-  if (absencesStore.absences.length === 0) {
-    await absencesStore.fetchAbsences();
-  }
-
-  // Also fetch pending requests for the calendar
-  await absencesStore.fetchPendingRequests();
-});
+onMounted(load);
 </script>
 
 <template>
@@ -139,7 +140,12 @@ onMounted(async () => {
           <div class="ml-4">
             <p class="text-sm font-medium text-neutral-500">{{ $t('absences.vacationAvailable') }}</p>
             <p class="text-xl font-bold text-blue-600">
-              {{ $t('absences.daysAvailable', { remaining: remainingVacationDays, total: maxVacationDays }) }}
+              <template v-if="maxVacationDays !== null">
+                {{ $t('absences.daysAvailable', { remaining: remainingVacationDays, total: maxVacationDays }) }}
+              </template>
+              <template v-else>
+                {{ $t('requests.daysCount', { count: remainingVacationDays }) }}
+              </template>
             </p>
           </div>
         </div>
@@ -177,18 +183,22 @@ onMounted(async () => {
 
     <!-- View Mode Toggle -->
     <div class="flex justify-end mb-4">
-      <div class="bg-white rounded-lg shadow p-1 inline-flex">
+      <div class="bg-white rounded-lg shadow p-1 inline-flex" role="group">
         <button
+          type="button"
           @click="viewMode = 'list'"
-          class="px-3 py-1 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           :class="viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
+          :aria-pressed="viewMode === 'list'"
         >
           {{ $t('absences.list') }}
         </button>
         <button
+          type="button"
           @click="viewMode = 'calendar'"
-          class="px-3 py-1 rounded-md text-sm font-medium transition-colors"
+          class="px-4 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
           :class="viewMode === 'calendar' ? 'bg-primary-600 text-white' : 'text-neutral-600 hover:bg-neutral-100'"
+          :aria-pressed="viewMode === 'calendar'"
         >
           {{ $t('absences.calendar') }}
         </button>
@@ -247,15 +257,19 @@ onMounted(async () => {
         </div>
         
         <!-- Loading state -->
-        <div v-if="loading" class="p-8 flex justify-center">
+        <div v-if="loading" class="p-8 flex justify-center" role="status">
           <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600"></div>
+          <span class="sr-only">{{ $t('common.loading') }}</span>
         </div>
-        
+
+        <!-- Error state: a failed load is not "no absences" -->
+        <ErrorState v-else-if="absencesStore.absencesError" class="shadow-none" @retry="load" />
+
         <!-- Empty state -->
         <div v-else-if="filteredAbsences.length === 0" class="p-8 text-center">
           <div class="inline-flex items-center justify-center h-12 w-12 rounded-full bg-neutral-100 text-neutral-500 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
           <h3 class="text-lg font-medium text-neutral-800">{{ $t('absences.noAbsences') }}</h3>
@@ -263,63 +277,64 @@ onMounted(async () => {
             {{ absencesStore.absences.length === 0 ? $t('absences.noRecordedAbsences') : $t('absences.noMatchFilter') }}
           </p>
         </div>
-        
-        <!-- Absences Table -->
-        <div v-else class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-neutral-200">
-            <thead class="bg-neutral-50">
-              <tr>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  {{ $t('workLogs.date') }}
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  {{ $t('requests.type') }}
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  {{ $t('absences.duration') }}
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  {{ $t('absences.status') }}
-                </th>
-                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
-                  {{ $t('workLogs.notes') }}
-                </th>
-              </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-neutral-200">
-              <tr v-for="absence in filteredAbsences" :key="absence.id">
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800">
-                  {{ format(parseISO(absence.date), 'MMM d, yyyy', { locale: dateLocale }) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                        :class="getAbsenceTypeClass(absence.absenceType?.code)">
-                    {{ absence.absenceType?.name || t('absences.absence') }}
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                  {{ formatAbsenceDuration(absence) }}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm">
-                  <span v-if="absence.request?.status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                        :class="{
-                          'bg-green-100 text-green-800': absence.request.status === 'approved',
-                          'bg-yellow-100 text-yellow-800': absence.request.status === 'pending',
-                          'bg-red-100 text-red-800': absence.request.status === 'rejected'
-                        }">
-                    {{ absence.request.status.charAt(0).toUpperCase() + absence.request.status.slice(1) }}
-                  </span>
-                  <span v-else class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    Approved
-                  </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
-                  {{ absence.notes || '-' }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+
+        <template v-else>
+          <!-- Absences Table - Desktop -->
+          <div class="hidden md:block overflow-x-auto">
+            <table class="min-w-full divide-y divide-neutral-200">
+              <thead class="bg-neutral-50">
+                <tr>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {{ $t('workLogs.date') }}
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {{ $t('requests.type') }}
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {{ $t('absences.duration') }}
+                  </th>
+                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-neutral-500 uppercase tracking-wider">
+                    {{ $t('workLogs.notes') }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-neutral-200">
+                <tr v-for="absence in filteredAbsences" :key="absence.id">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-neutral-800">
+                    {{ formatApiDate(absence.date) }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                          :class="getAbsenceTypeClass(absence.absenceType?.code)">
+                      {{ absence.absenceType?.name || t('absences.absence') }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-neutral-600">
+                    {{ formatAbsenceDuration(absence) }}
+                  </td>
+                  <td class="px-6 py-4 text-sm text-neutral-600 max-w-xs truncate" :title="absence.notes || undefined">
+                    {{ absence.notes || '-' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mobile cards -->
+          <div class="md:hidden divide-y divide-neutral-200">
+            <div v-for="absence in filteredAbsences" :key="absence.id" class="p-4">
+              <div class="flex items-start justify-between gap-2 mb-1">
+                <span class="font-medium text-neutral-800">{{ formatApiDate(absence.date) }}</span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap"
+                      :class="getAbsenceTypeClass(absence.absenceType?.code)">
+                  {{ absence.absenceType?.name || t('absences.absence') }}
+                </span>
+              </div>
+              <p class="text-sm text-neutral-600">{{ formatAbsenceDuration(absence) }}</p>
+              <p v-if="absence.notes" class="mt-1 text-sm text-neutral-500 break-words">{{ absence.notes }}</p>
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
