@@ -52,7 +52,7 @@ export default {
     signInButton: 'Iniciar sesión',
     signingIn: 'Iniciando sesión...',
     tagline: 'Gestión del tiempo de trabajo',
-    emailPlaceholder: 'tu.correo@ejemplo.com',
+    emailPlaceholder: "tu.correo{'@'}ejemplo.com",
     sessionExpired: 'Tu sesión ha caducado. Vuelve a iniciar sesión.',
     sessionLoadFailedTitle: 'No se ha podido cargar tu sesión',
     sessionLoadFailedBody: 'Puede que no tengas conexión o que el servidor no responda. Tu sesión sigue abierta.',

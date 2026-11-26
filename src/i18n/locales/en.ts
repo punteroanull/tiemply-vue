@@ -52,7 +52,7 @@ export default {
     signInButton: 'Sign in',
     signingIn: 'Signing in...',
     tagline: 'Employee time management',
-    emailPlaceholder: 'your.email@example.com',
+    emailPlaceholder: "your.email{'@'}example.com",
     sessionExpired: 'Your session has expired. Please sign in again.',
     sessionLoadFailedTitle: 'Your session could not be loaded',
     sessionLoadFailedBody: 'You may be offline or the server may not be responding. You are still signed in.',
